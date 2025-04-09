@@ -1,4 +1,4 @@
-package Caso2;
+package Caso2.Servidor;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -14,35 +14,24 @@ public class ServPrincipal {
         ServerSocket ss = null;
         boolean continuar = true;
         ArrayList<ArrayList<String>> servidores = tablaServidores(); // Matriz almacena datos servidores
+        int i = 0; // Contador para los hilos
 
         try {
-            ss = new ServerSocket(); // TODO: no sé cuál es el puerto del principal
+            ss = new ServerSocket(puerto); // TODO: no sé cuál es el puerto del principal
+            System.out.println("Servidor principal activado ...");
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(-1);
         }
 
         while (continuar) {
-            // crear el socket en el lado servidor
-            // queda bloqueado esperando a que llegue un cliente
+            // crear el socket del servidor y espera un cliente
             Socket socket = ss.accept();
+            System.out.println("Cliente conectado: " + socket.getInetAddress()); // IP de quien se conectó
 
-            try {
-                // se conectan los flujos, tanto de salida como de entrada
-                PrintWriter escritor = new PrintWriter(socket.getOutputStream(), true);
-                BufferedReader lector = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream()));
-
-                // se ejecuta el protocolo en el lado servidor
-                ProtocoloServPrincipal.procesar(lector, escritor);
-
-                // se cierran los flujos y el socket
-                escritor.close();
-                lector.close();
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            // Crear un nuevo hilo para manejar al cliente
+            new ThreadServPrincipal(socket, i).start();
+            i++; // Incrementar contador hilos
         }
 
     

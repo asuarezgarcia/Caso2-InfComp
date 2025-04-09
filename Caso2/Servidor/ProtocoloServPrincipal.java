@@ -1,4 +1,4 @@
-package Caso2;
+package Caso2.Servidor;
 
 import java.io.BufferedReader;
 import java.io.IOException;
