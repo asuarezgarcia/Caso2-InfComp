@@ -30,15 +30,15 @@ public class ThreadServPrincipal extends Thread {
             BufferedReader lector = new BufferedReader(new InputStreamReader(sktCli.getInputStream()));
             PrintWriter escritor = new PrintWriter(sktCli.getOutputStream(), true);
             
-            // Paso 2b y 3: Recibir reto (número aleatorio) y calcular ruta
+            // Paso 2b y 3: Recibir reto (número aleatorio) y calcular ruta con RSA
 
             // Paso 4: Enviar ruta al cliente
 
-            // Paso 7: Si recibe error, terminar, si es OK, generar G, P, G^x, y F(K_w-, (G, P, G^x))
+            // Paso 7: Si recibe error, terminar, si es OK, generar G, P, G^x, y F(K_w-, (G, P, G^x)) con DiffieHellman1
 
-            // Paso 11b: Recibe G^y, luego calcula (G^y)^x 
+            // Paso 11b: Recibe G^y, luego calcula (G^y)^x con DiffieHellman2
             
-            // Paso 11b.2: calcula llave simétrica para cifrar K_AB1 y MAC K_AB2
+            // Paso 11b.2: calcula llave simétrica para cifrar K_AB1 y MAC K_AB2 con AES y HMAC respectivamente
             
             // Paso 13: Envía C(K_AB1, tabla_ids_servicios) y HMAC(MAC K_AB2, tabla_ids_servicios)
 
