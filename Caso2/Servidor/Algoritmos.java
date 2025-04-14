@@ -156,7 +156,15 @@ public class Algoritmos {
         }
     } 
 
-
+    // Cifrado HMAC 
+    public static byte[] calculoHMac(byte [] clave, byte[] texto) throws Exception { 
+        String algoritmo = "HmacSHA256"; // Algoritmo HMAC-SHA256 
+        SecretKeySpec secretKey = new SecretKeySpec(clave, algoritmo);  // Crear clave secreta
+        Mac mac = Mac.getInstance(algoritmo); // Crear objeto Mac 
+        mac.init(secretKey); // Inicializar el objeto Mac con la clave secreta 
+        byte[] hmac = mac.doFinal(texto); // Calcular HMAC 
+        return hmac; // Retornar el HMAC calculado
+    }
 
 
     // Verificar 2 números
@@ -172,14 +180,5 @@ public class Algoritmos {
         }
         return true; // Los digests son iguales
     } 
-     // Cifrado HMAC 
-    public static byte[] calculoHMac(byte [] clave, byte[] texto) throws Exception { 
-        String algoritmo = "HmacSHA256"; // Algoritmo HMAC-SHA256 
-        SecretKeySpec secretKey = new SecretKeySpec(clave, algoritmo);  // Crear clave secreta
-        Mac mac = Mac.getInstance(algoritmo); // Crear objeto Mac 
-        mac.init(secretKey); // Inicializar el objeto Mac con la clave secreta 
-        byte[] hmac = mac.doFinal(texto); // Calcular HMAC 
-        return hmac; // Retornar el HMAC calculado
-        
-    }
+    
 }

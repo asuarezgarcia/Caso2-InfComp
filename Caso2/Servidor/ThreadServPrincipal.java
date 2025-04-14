@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.security.*;
 
 // Aquí se maneja cada conexión de cliente en un hilo separado.
 // Se manejan los enviós y recepciones del orden de diferentes mensajes
@@ -14,6 +15,8 @@ public class ThreadServPrincipal extends Thread {
     // Atributos
     private Socket sktCli = null;
     private int id; // Atributo para identificar el thread
+    private PublicKey llavePublica = null; // Guarda llave pública
+    private PrivateKey llavePrivada = null; // Guarda llave privada
 
     // Constructor
     public ThreadServPrincipal(Socket socket, int id) {
@@ -29,10 +32,20 @@ public class ThreadServPrincipal extends Thread {
             // se conectan los flujos para leer y escribir
             BufferedReader lector = new BufferedReader(new InputStreamReader(sktCli.getInputStream()));
             PrintWriter escritor = new PrintWriter(sktCli.getOutputStream(), true);
-            
-            // Paso 2b y 3: Recibir reto (número aleatorio) y calcular ruta con RSA
 
-            // Paso 4: Enviar ruta al cliente
+            // Paso 0a: Leer llaves pública y privada
+            try {
+                this.llavePublica = Algoritmos.leerLlavePublica("llavePublica.key"); // Leer llave pública
+                this.llavePrivada = Algoritmos.leerLlavePrivada("llavePrivada.key"); // Leer llave privada
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+                throw new RuntimeException("Error al leer la llaves pública y privada", e);
+            }
+            
+            // Paso 2b, 3 y 4: Recibir reto (número aleatorio), calcular ruta con Rta con RSA y enviarlo
+            String reto = lector.readLine(); // Leer reto
+            byte[] Rta = Algoritmos.RSA(llavePrivada, reto.getBytes(), true); // Cifrar el reto con la llave privada
+            escritor.println(new String(Rta)); // Enviar el reto cifrado al cliente
 
             // Paso 7: Si recibe error, terminar, si es OK, generar G, P, G^x, y F(K_w-, (G, P, G^x)) con DiffieHellman1
 
