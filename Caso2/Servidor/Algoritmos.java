@@ -4,6 +4,7 @@ import java.io.*;
 import java.security.*;
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.DHParameterSpec;
 
 public class Algoritmos {
 
@@ -79,20 +80,46 @@ public class Algoritmos {
 
     // Diffie-Hellman
     // Parte 1
-    public static int DiffieHellman1(int P, int G, int X) {
-        // Generar número aleatorio X (secreto) entre 1 y P-1
-        
+    public static KeyPair DiffieHellman1() throws Exception {
+        // Generar parámetros
+        AlgorithmParameterGenerator generador = AlgorithmParameterGenerator.getInstance("DH");
+        generador.init(1024); // Tamaño de la clave en bits
+        AlgorithmParameters parametros = generador.generateParameters();
 
-        // Generar y
-        int Y = (int) Math.pow(G, X) % P; // G^X mod P
-        return Y;
+        // Generar clave privada
+        KeyPairGenerator generadorLlave = KeyPairGenerator.getInstance("DH");
+        generadorLlave.initialize(parametros.getParameterSpec(DHParameterSpec.class));
+        KeyPair parLlave = generadorLlave.generateKeyPair(); // Generar el par de llaves
+
+        return parLlave; // Retornar la llave pública y privada
     }
 
     // Parte 2
-    public static int DiffieHellman2(int P, int Y, int X) {
-        // Calcular llave final
-        int K = (int) Math.pow(Y, X) % P; // Y^X mod P
-        return K;
+    public static SecretKey DiffieHellman2(PrivateKey llavePrivada, PublicKey llavePublicaRecibida) throws Exception {
+        // Crear el acuerdo de claves Diffie-Hellman
+        KeyAgreement acuerdo = KeyAgreement.getInstance("DH");
+    
+        // Inicializar el acuerdo con la llave privada propia
+        acuerdo.init(llavePrivada);
+    
+        // Realizar la fase del acuerdo con la llave pública recibida
+        acuerdo.doPhase(llavePublicaRecibida, true);
+    
+        // Generar la llave secreta compartida como un arreglo de bytes
+        return acuerdo.generateSecret("SHA-512");
+    }
+
+
+    // Digestion SHA-512
+    public static byte[] Digest(byte[] data) {
+        try{
+            String algorithm = "SHA-512"; // Algoritmo de digestión SHA-512
+            MessageDigest digest = MessageDigest.getInstance(algorithm);
+            digest.update(data);
+            return digest.digest();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
 
@@ -129,5 +156,19 @@ public class Algoritmos {
     } 
 
 
-    
+
+
+    // Verificar 2 números
+    public static boolean verificar(byte[] num1, byte[] num2){
+        if (num1.length != num2.length) {
+            System.out.println("Los digests no son iguales");
+            return false; // Los digests no son iguales
+        }
+        for (int i = 0; i < num1.length; i++){
+            if (num1[i] != num2[i]) {
+                return false; // Los digests no son iguales
+            }
+        }
+        return true; // Los digests son iguales
+    }
 }
