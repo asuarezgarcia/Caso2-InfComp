@@ -37,6 +37,11 @@ public class ServPrincipal {
     
     }
 
+    // getter de la tabla de servidores
+    public static ArrayList<ArrayList<String>> getTablaServidores() {
+        return tablaServidores();
+    }
+
     // Método crear matriz
     public static ArrayList<ArrayList<String>> tablaServidores(){
         ArrayList<ArrayList<String>> servidores = new ArrayList<>();
