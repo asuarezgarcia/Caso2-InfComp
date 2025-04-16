@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.security.spec.*;
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 // Aquí se maneja cada conexión de cliente en un hilo separado.
 // Se manejan los enviós y recepciones del orden de diferentes mensajes
@@ -25,8 +27,9 @@ public class ThreadServPrincipal extends Thread {
     private PrivateKey llavePrivada = null; // Guarda llave privada RSA
     private KeyPair parLlavesDH = null; // Guarda llaves DH
     private SecretKey llaveSimetrica = null; // Guarda llave simétrica AES
-    private byte[] K_AB1 = null; // Guarda K_AB1
+    private SecretKey K_AB1 = null; // Guarda K_AB1
     private byte[] K_AB2 = null; // Guarda K_AB2
+    private IvParameterSpec iv = null; // Guarda IV para AES
 
     // Constructor
     public ThreadServPrincipal(Socket socket, int id) {
@@ -84,6 +87,12 @@ public class ThreadServPrincipal extends Thread {
             // Paso 11b: Recibe G^y, luego calcula (G^y)^x con DiffieHellman2
             String gY = lector.readLine(); // Leer G^y del cliente
             byte[] gYBytes = Base64.getDecoder().decode(gY); // Decodificar G^y de Base64
+
+            String IV = lector.readLine(); // Leer IV del cliente
+            byte[] ivBytes = Base64.getDecoder().decode(IV); // Decodificar IV de Base64
+            this.iv = new IvParameterSpec(ivBytes);
+
+
             try{
                 PublicKey llPublicaRecibida = KeyFactory.getInstance("DH").generatePublic(new X509EncodedKeySpec(gYBytes)); // Generar llave pública DH
                 PrivateKey llPriv = parLlavesDH.getPrivate(); // Obtener llave privada DH 
@@ -99,10 +108,12 @@ public class ThreadServPrincipal extends Thread {
                 byte[] llaveSimetricaBytes = llaveSimetrica.getEncoded(); // Obtener bytes de la llave simétrica
                 byte[] resultDigest = Algoritmos.Digest(llaveSimetricaBytes); // Calcular K_AB1 con digest
                 // Guardamos K_AB1 y K_AB2
+                byte[] KAB1 = new byte[resultDigest.length / 2];
                 for (int i = 0; i < resultDigest.length / 2; i++) {
-                    K_AB1[i] = resultDigest[i]; // Guardar K_AB1
+                    KAB1[i] = resultDigest[i]; // Guardar K_AB1
                     K_AB2[i] = resultDigest[i + (resultDigest.length / 2)]; // Guardar K_AB2
                 }
+                this.K_AB1 = new SecretKeySpec(KAB1, 0, KAB1.length, "AES");
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -116,11 +127,50 @@ public class ThreadServPrincipal extends Thread {
                 tablaIdsServicios.add(servidores.get(i).get(0)); // Agregar id de servicio a la tabla
             }
             
+            for (int i = 0; i < tablaIdsServicios.size(); i++) {
+                String idServicio = tablaIdsServicios.get(i); // Obtener id de servicio
+                byte[] cifrado = Algoritmos.AES(K_AB1, idServicio, iv, true); // Cifrar id de servicio con AES
+                escritor.println(Base64.getEncoder().encodeToString(cifrado)); // Enviar id de servicio cifrado al cliente
 
-
+                byte[] idServicioBytes = idServicio.getBytes(); // Obtener bytes del id de servicio
+                try {
+                    byte[] hmac = Algoritmos.calculoHMac(K_AB2, idServicioBytes); // Calcular HMAC del id de servicio
+                    escritor.println(Base64.getEncoder().encodeToString(hmac)); // Enviar HMAC al cliente
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new RuntimeException("Error al calcular HMAC del id de servicio", e);
+                }
+            }
 
             // Paso 15: Verifica HMAC; recibe C(K_AB1, id_servicio + ip_cliente) y HMAC(K_AB2, id_servicio + ip_cliente)
+            String idServicioCifrado = lector.readLine(); // Leer id de servicio 
+            byte[] idServicioDecifrado = Algoritmos.AES(K_AB1, idServicioCifrado, iv, false); // Descifrar id de servicio
+            String buscado = new String(idServicioDecifrado); // Convertir bytes a string
 
+                //Verificar HMAC
+            String hmacRecibido = lector.readLine(); // Leer HMAC recibido
+            byte[] hmacRecibidoBytes = Base64.getDecoder().decode(hmacRecibido); // Decodificar HMAC recibido
+            if(Algoritmos.verificar(hmacRecibidoBytes, K_AB2)) { // Verificar HMAC
+                System.out.println("HMAC correcto"); // Imprimir HMAC correcto 
+            } else {
+                System.out.println("HMAC incorrecto"); // Imprimir HMAC incorrecto #TODO debería haber algo que termine la sesión
+            }
+
+            for (int j = 0; j < servidores.size(); j++) { // Buscamos en la tabla de servicios completa
+                if (servidores.get(j).get(0).equals(buscado)) { // Hallar servicio buscado
+                    String ipServidor = servidores.get(j).get(2); // Obtener ip del servidor
+                    String puertoServidor = servidores.get(j).get(3); // Obtener puerto del servidor
+
+                    byte [] ipCifrado = Algoritmos.AES(K_AB1, ipServidor, iv, true); // Cifrar ip
+                    byte [] puertoCifrado = Algoritmos.AES(K_AB1, puertoServidor, iv, true); // Cifrar puerto
+
+                    escritor.println(Base64.getEncoder().encodeToString(ipCifrado)); // Enviar ip cifrada al cliente
+                    escritor.println(Base64.getEncoder().encodeToString(puertoCifrado)); // Enviar puerto cifrado al cliente
+                    System.out.println("Id de servicio correcto: " + buscado); // Imprimir id de servicio correcto
+                    break;
+                }    
+                break;
+            }
             // Paso 16: Envía C(K_AB1, ip_servidor + puerto_servidor) y HMAC(K_AB2, ip_servidor + puerto_servidor)
 
             // Final: recibe "Ok" o "Error" y termina el hilo
