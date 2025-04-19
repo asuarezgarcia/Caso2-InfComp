@@ -126,7 +126,7 @@ public class Algoritmos {
 
     // AES (llave 256 bits/ 32 bytes) usando CBC (llaves de 128 bits)
     // Generar IV (vector de inicialización) de 32 bytes    
-    public byte[] generarIV() {
+    public static byte[] generarIV() {
         byte[] iv = new byte[32]; // 32 bytes para AES
         SecureRandom random = new SecureRandom();
         random.nextBytes(iv);
