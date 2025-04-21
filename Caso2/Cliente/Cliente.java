@@ -11,6 +11,9 @@ import java.security.SecureRandom;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+
 import Caso2.Servidor.Algoritmos;
 
 
@@ -93,7 +96,14 @@ public class Cliente {
             boolean verificacion = Algoritmos.verificar(hmac, hmac_ideal); // Verificar HMAC 
         
             // Si HMAC esta bien, Cifro respuesta de eleccion y envio el HMAC 
-            
+            if (verificacion) { // Si la verificación es correcta
+                String servicios = lector.readLine(); // Enviar OK al servidor 
+                SecretKey llave = null; 
+                IvParameterSpec ivParameter  = new IvParameterSpec(iv); 
+                byte [] respuesta = Algoritmos.AES(llave, servicios, ivParameter, false); // Cifrar la respuesta con la llave simétrica y el IV
+            } else {
+                escritor.println("ERROR"); // Enviar ERROR al servidor
+            }
             //Cuando me den la ip y el puerto, verifico HMAC y desencripto la respuesta del servidor , si esta bien OK o ERROR
         } catch (Exception e) {
             e.printStackTrace(); 
