@@ -3,6 +3,8 @@ package Caso2.Servidor;
 import java.io.*;
 import java.math.BigInteger;
 import java.security.*;
+import java.util.Base64;
+
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -114,7 +116,7 @@ public class Algoritmos {
     }
 
     // Parte 2 
-    public static SecretKey DiffieHellman2(PrivateKey llavePrivada, PublicKey llavePublicaRecibida) throws Exception {
+    public static byte[] DiffieHellman2(PrivateKey llavePrivada, PublicKey llavePublicaRecibida) throws Exception {
         // Crear el acuerdo de claves Diffie-Hellman
         KeyAgreement acuerdo = KeyAgreement.getInstance("DH");
     
@@ -123,9 +125,9 @@ public class Algoritmos {
     
         // Realizar la fase del acuerdo con la llave pública recibida
         acuerdo.doPhase(llavePublicaRecibida, true);
-    
-        // Generar la llave secreta compartida como un arreglo de bytes
-        return acuerdo.generateSecret("SHA-512");
+
+        // Generar llave simétrica
+        return acuerdo.generateSecret(); 
     }
 
     
@@ -145,9 +147,9 @@ public class Algoritmos {
 
 
     // AES (llave 256 bits/ 32 bytes) usando CBC (llaves de 128 bits)
-    // Generar IV (vector de inicialización) de 32 bytes    
+    // Generar IV (vector de inicialización) de 16 bytes    
     public static byte[] generarIV() {
-        byte[] iv = new byte[32]; // 32 bytes para AES
+        byte[] iv = new byte[16]; // 16 bytes para AES
         SecureRandom random = new SecureRandom();
         random.nextBytes(iv);
         return iv;
@@ -155,21 +157,24 @@ public class Algoritmos {
 
     // Cifrar o descifrar texto con AES
     public static byte[] AES(SecretKey llave, String texto, IvParameterSpec IV, boolean encrypt) { 
-        byte[] textoCifrado; 
+         
         String PADDIG = "AES/CBC/PKCS5Padding"; 
 
         try {
             Cipher cifrador = Cipher.getInstance(PADDIG); 
-            byte[] textoClaro = texto.getBytes();
 
             if (encrypt) {
-                cifrador.init(Cipher.ENCRYPT_MODE, llave, IV); // Cifrador en modo de cifrado
+                byte[] textoCifrado;
+                cifrador.init(Cipher.ENCRYPT_MODE, llave, IV); // Cifrado
+                byte[] textoClaro = texto.getBytes("UTF-8"); // Convertir texto a bytes
+                return cifrador.doFinal(textoClaro); // Cifrar el texto claro
+
             } else {
-                cifrador.init(Cipher.DECRYPT_MODE, llave, IV); // Cifrador en modo de descifrado
+                byte[] textoClaro = Base64.getDecoder().decode(texto); // Decodificar el texto cifrado
+                cifrador.init(Cipher.DECRYPT_MODE, llave, IV); // Descifrado
+                return cifrador.doFinal(textoClaro); // Descifrar el texto cifrado
             }
 
-            textoCifrado = cifrador.doFinal(textoClaro); // Cifrar o descifrar el texto claro
-            return textoCifrado;
         } catch (Exception e) {
             System.out.println("Error en AES: " + e.getMessage());
             return null;

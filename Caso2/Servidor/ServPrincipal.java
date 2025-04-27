@@ -17,8 +17,12 @@ public class ServPrincipal {
         ArrayList<ArrayList<String>> servidores = tablaServidores(); // Matriz almacena datos servidores
         int i = 0; // Contador para los hilos
 
+        // Generar llaves RSA
+        Algoritmos.generarLlavesRSA(); 
+        System.out.println("Llaves RSA generadas y guardadas en archivos.");
+
         try {
-            ss = new ServerSocket(puerto); // TODO: no sé cuál es el puerto del principal
+            ss = new ServerSocket(3400); // TODO: no sé cuál es el puerto del principal
             System.out.println("Servidor principal activado ...");
         } catch (IOException e) {
             e.printStackTrace();
