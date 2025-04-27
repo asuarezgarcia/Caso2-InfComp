@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.math.BigInteger;
 import java.net.Socket;
 
 
@@ -12,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.security.spec.*;
 import javax.crypto.*;
+import javax.crypto.interfaces.DHPublicKey;
+import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -60,6 +63,15 @@ public class ThreadServPrincipal extends Thread {
             byte[] Rta = Algoritmos.RSA(llavePrivada, reto.getBytes(), true); // Cifrar el reto con la llave privada
             escritor.println(new String(Rta)); // Enviar el reto cifrado al cliente
 
+            // Recibir ok o error
+            String respuesta1 = lector.readLine(); // Leer respuesta del cliente
+            if (respuesta1.equals("Error")) { // Si la respuesta es Error
+                System.out.println("Error en la conexión, cerrando el hilo."); // Imprimir error
+                return; // Terminar el hilo si hay error
+            } else {
+                System.out.println("Respuesta correcta del cliente: " + respuesta1); // Imprimir respuesta correcta
+            }
+
             // Paso 7: Si recibe error, terminar, si es OK, generar G, P, G^x, y F(K_w-, (G, P, G^x)) con DiffieHellman1
             if (lector.readLine().equals("Error")) {
                 System.out.println("Error en la conexión, cerrando el hilo.");
@@ -74,14 +86,42 @@ public class ThreadServPrincipal extends Thread {
 
                     // Guardar llaves DH en atributo
                     this.parLlavesDH = parLlaves; 
+
+                    // Obtener parámetros DH
+                    DHParameterSpec dhSpec = ((DHPublicKey) llavePublica).getParams(); // Obtener parámetros DH
+                    BigInteger g = dhSpec.getG(); // Obtener G
+                    BigInteger p = dhSpec.getP(); // Obtener P
+                    String Gx = new String(Base64.getEncoder().encode(dhPublica.getEncoded()));
+                    String enviar = g + ";" + p + ";" + Gx; // Crear string con G, P y G^x
+
+                    // Firmar mensaje
+                    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                    byte[] hash = digest.digest(enviar.getBytes()); // Calcular hash del mensaje
+
+                    byte[] firma = Algoritmos.RSA(llavePrivada, hash, true); // Firmar el mensaje con la llave privada
+                    String firmaBase64 = Base64.getEncoder().encodeToString(firma); // Convertir firma a Base64
+
+                    // Enviar P, G y G^x mod P al cliente firmado con llave pública RSA
                     
-                    // Mandar llave pública al cliente
-                    String publicaBase64 = Base64.getEncoder().encodeToString(dhPublica.getEncoded()); // Codificar llave pública en Base64
-                    escritor.println(publicaBase64); // Enviar llave pública al cliente
+
+                    escritor.println(p.toString()); // Enviar P
+                    escritor.println(g.toString()); // Enviar G
+                    escritor.println(Base64.getEncoder().encodeToString(dhPublica.getEncoded())); // Enviar G^x mod P
+                    escritor.println(firmaBase64); // Enviar firma
+                    System.out.println("Valores enviados al cliente: P, G, G^x mod P");
 
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+            }
+
+            // Recibir ok o error
+            String respuesta2 = lector.readLine(); // Leer respuesta del cliente
+            if (respuesta2.equals("Error")) { // Si la respuesta es Error
+                System.out.println("Error en la conexión, cerrando el hilo."); // Imprimir error
+                return; // Terminar el hilo si hay error
+            } else {
+                System.out.println("Respuesta correcta del cliente: " + respuesta2); // Imprimir respuesta correcta
             }
 
             // Paso 11b: Recibe G^y, luego calcula (G^y)^x con DiffieHellman2
@@ -94,9 +134,13 @@ public class ThreadServPrincipal extends Thread {
 
 
             try{
-                PublicKey llPublicaRecibida = KeyFactory.getInstance("DH").generatePublic(new X509EncodedKeySpec(gYBytes)); // Generar llave pública DH
-                PrivateKey llPriv = parLlavesDH.getPrivate(); // Obtener llave privada DH 
-                SecretKey llaveSimetrica = Algoritmos.DiffieHellman2( llPriv, llPublicaRecibida); // Calcular llave simétrica 
+                // Reconstruir llave pública recibida
+                KeyFactory keyFactory = KeyFactory.getInstance("DH"); // Crear generador de llaves DH
+                PublicKey llPublicaRecibida = keyFactory.generatePublic(new X509EncodedKeySpec(gYBytes)); // Generar llave pública DH
+
+                // Calcular llave simétrica
+                SecretKey llaveSimetrica = Algoritmos.DiffieHellman2( parLlavesDH.getPrivate(), llPublicaRecibida); // Calcular llave simétrica 
+                
                 this.llaveSimetrica = llaveSimetrica; // Guardar llave simétrica en atributo
 
             } catch (Exception e) {
@@ -107,40 +151,43 @@ public class ThreadServPrincipal extends Thread {
             try {
                 byte[] llaveSimetricaBytes = llaveSimetrica.getEncoded(); // Obtener bytes de la llave simétrica
                 byte[] resultDigest = Algoritmos.Digest(llaveSimetricaBytes); // Calcular K_AB1 con digest
-                // Guardamos K_AB1 y K_AB2
-                byte[] KAB1 = new byte[resultDigest.length / 2];
-                for (int i = 0; i < resultDigest.length / 2; i++) {
-                    KAB1[i] = resultDigest[i]; // Guardar K_AB1
-                    K_AB2[i] = resultDigest[i + (resultDigest.length / 2)]; // Guardar K_AB2
-                }
-                this.K_AB1 = new SecretKeySpec(KAB1, 0, KAB1.length, "AES");
+                
+                // Dividir el digest en dos partes
+                int mitad = resultDigest.length / 2;
+                byte[] KAB1 = new byte[mitad];
+                byte[] KAB2 = new byte[mitad];
+                System.arraycopy(resultDigest, 0, KAB1, 0, mitad); // 1era mitad K_AB1
+                System.arraycopy(resultDigest, mitad, KAB2, 0, mitad); // 2nda mitad K_AB2
+
+                // Crear llaves
+                this.K_AB1 = new SecretKeySpec(KAB1, "AES");
+                this.K_AB2 = KAB2;
 
             } catch (Exception e) {
                 e.printStackTrace();
             }
             
             // Paso 13: Cifrar y enviar C(K_AB1, tabla_ids_servicios) y HMAC(MAC K_AB2, tabla_ids_servicios)
-
+                // Enviar tabla
             ArrayList<ArrayList<String>> servidores = ServPrincipal.getTablaServidores(); // Obtener tabla de servidores
-            ArrayList<String> tablaIdsServicios = new ArrayList<>(); 
+            String envioTabla = "";
             for (int i = 0; i < servidores.size(); i++) {
-                tablaIdsServicios.add(servidores.get(i).get(0)); // Agregar id de servicio a la tabla
+                String serv = servidores.get(i).get(0); // Agregar id de servicio a la tabla
+                envioTabla += serv + ";"; // Agregar id al envio de la tabla
             }
-            
-            for (int i = 0; i < tablaIdsServicios.size(); i++) {
-                String idServicio = tablaIdsServicios.get(i); // Obtener id de servicio
-                byte[] cifrado = Algoritmos.AES(K_AB1, idServicio, iv, true); // Cifrar id de servicio con AES
-                escritor.println(Base64.getEncoder().encodeToString(cifrado)); // Enviar id de servicio cifrado al cliente
+            byte[] cifrado = Algoritmos.AES(K_AB1, envioTabla, iv, true); // Cifrar id de servicio con AES
+            escritor.println(Base64.getEncoder().encodeToString(cifrado)); // Enviar id de servicio cifrado al cliente
 
-                byte[] idServicioBytes = idServicio.getBytes(); // Obtener bytes del id de servicio
-                try {
-                    byte[] hmac = Algoritmos.calculoHMac(K_AB2, idServicioBytes); // Calcular HMAC del id de servicio
-                    escritor.println(Base64.getEncoder().encodeToString(hmac)); // Enviar HMAC al cliente
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    throw new RuntimeException("Error al calcular HMAC del id de servicio", e);
-                }
+                // Enviar HMAC
+            byte[] TablaBytes = envioTabla.getBytes(); // Pasar bytes de la tabla
+            try {
+                byte[] hmac = Algoritmos.calculoHMac(K_AB2, TablaBytes); // Calcular HMAC 
+                escritor.println(Base64.getEncoder().encodeToString(hmac)); // Enviar HMAC al cliente
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("Error al calcular HMAC del id de servicio", e);
             }
+        
 
             // Paso 15: Verifica HMAC; recibe C(K_AB1, id_servicio + ip_cliente) y HMAC(K_AB2, id_servicio + ip_cliente)
             String idServicioCifrado = lector.readLine(); // Leer id de servicio 
@@ -154,38 +201,50 @@ public class ThreadServPrincipal extends Thread {
                 System.out.println("HMAC correcto"); // Imprimir HMAC correcto 
             } else {
                 System.out.println("HMAC incorrecto"); // Imprimir HMAC incorrecto #TODO debería haber algo que termine la sesión
+                return; // Terminar el hilo si hay error
             }
 
+            // Paso 16: Envía C(K_AB1, ip_servidor + puerto_servidor) y HMAC(K_AB2, ip_servidor + puerto_servidor)
+                // Enviar ip y puerto
             for (int j = 0; j < servidores.size(); j++) { // Buscamos en la tabla de servicios completa
                 if (servidores.get(j).get(0).equals(buscado)) { // Hallar servicio buscado
+
+                    // Enviar ip y puerto del servidor
                     String ipServidor = servidores.get(j).get(2); // Obtener ip del servidor
                     String puertoServidor = servidores.get(j).get(3); // Obtener puerto del servidor
+                    String envioIPPuerto = ipServidor + ";" + puertoServidor; // Crear string con ip y puerto
 
-                    byte [] ipCifrado = Algoritmos.AES(K_AB1, ipServidor, iv, true); // Cifrar ip
-                    byte [] puertoCifrado = Algoritmos.AES(K_AB1, puertoServidor, iv, true); // Cifrar puerto
+                    byte [] Cifrado = Algoritmos.AES(K_AB1, envioIPPuerto, iv, true); // Cifrar ip
 
-                    escritor.println(Base64.getEncoder().encodeToString(ipCifrado)); // Enviar ip cifrada al cliente
-                    escritor.println(Base64.getEncoder().encodeToString(puertoCifrado)); // Enviar puerto cifrado al cliente
+                    escritor.println(Base64.getEncoder().encodeToString(Cifrado)); // Enviar ip cifrada al cliente
                     System.out.println("Id de servicio correcto: " + buscado); // Imprimir id de servicio correcto
+
+                    // Enviar HMAC
+                    try {
+                        byte[] envioIPPuertoBytes = envioIPPuerto.getBytes(); // Pasar envioi a bytes
+                        byte[] hmac = Algoritmos.calculoHMac(K_AB2, envioIPPuertoBytes); // Calcular HMAC 
+                        escritor.println(Base64.getEncoder().encodeToString(hmac)); // Enviar HMAC al cliente
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        throw new RuntimeException("Error al calcular HMAC de la ip y puerto", e);
+                    }    
+
                     break;
                 }    
                 break;
             }
-            // Paso 16: Envía C(K_AB1, ip_servidor + puerto_servidor) y HMAC(K_AB2, ip_servidor + puerto_servidor)
+
 
             // Final: recibe "Ok" o "Error" y termina el hilo
+            String respuesta3 = lector.readLine(); // Leer respuesta del cliente
+            if (respuesta3.equals("Ok")) { // Si la respuesta es Ok
+                System.out.println("Respuesta correcta del cliente: " + respuesta3); // Imprimir respuesta correcta
+            } else {
+                System.out.println("Error en la respuesta del cliente: " + respuesta3); // Imprimir error en la respuesta
+            }
 
 
-            // se ejecuta el protocolo en el lado servidor
-            ProtocoloServPrincipal.procesar(lector, escritor);
-
-
-
-
-
-
-
-            // se cierran flujos y socket
+            // Se cierran flujos y socket
             lector.close();
             escritor.close();
             sktCli.close();

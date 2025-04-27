@@ -1,6 +1,7 @@
 package Caso2.Servidor;
 
 import java.io.*;
+import java.math.BigInteger;
 import java.security.*;
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
@@ -87,9 +88,12 @@ public class Algoritmos {
         generador.init(1024); // Tamaño de la clave en bits
         AlgorithmParameters parametros = generador.generateParameters();
 
+        // Obtener los parámetros de Diffie-Hellman
+        DHParameterSpec dhSpec = parametros.getParameterSpec(DHParameterSpec.class);
+
         // Generar clave privada
         KeyPairGenerator generadorLlave = KeyPairGenerator.getInstance("DH");
-        generadorLlave.initialize(parametros.getParameterSpec(DHParameterSpec.class));
+        generadorLlave.initialize(dhSpec);
         KeyPair parLlave = generadorLlave.generateKeyPair(); // Generar el par de llaves
 
         return parLlave; // Retornar la llave pública y privada
@@ -170,11 +174,12 @@ public class Algoritmos {
     // Verificar 2 números
     public static boolean verificar(byte[] num1, byte[] num2){
         if (num1.length != num2.length) {
-            System.out.println("Los digests no son iguales");
+            System.out.println("Números diferentes");
             return false; // Los digests no son iguales
         }
         for (int i = 0; i < num1.length; i++){
             if (num1[i] != num2[i]) {
+                System.out.println("Números diferentes");
                 return false; // Los digests no son iguales
             }
         }
