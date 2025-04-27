@@ -57,6 +57,15 @@ public class ThreadServPrincipal extends Thread {
                 e.printStackTrace();
                 throw new RuntimeException("Error al leer la llaves pública y privada", e);
             }
+
+            // Paso 1: Leer "HELLO" del cliente
+            String saludo = lector.readLine(); // Leer saludo del cliente
+            if (saludo.equals("HELLO")) { // Saludo correcto
+                System.out.println("Saludo correcto del cliente: " + saludo); // Imprimir saludo correcto
+            } else {
+                System.out.println("Error en el saludo del cliente: " + saludo); // Imprimir error en el saludo
+                return; // Terminar el hilo si hay error
+            }
             
             // Paso 2b, 3 y 4: Recibir reto (número aleatorio), calcular ruta con Rta con RSA y enviarlo
             String reto = lector.readLine(); // Leer reto
@@ -80,9 +89,8 @@ public class ThreadServPrincipal extends Thread {
             else {
                 try {
                     // Obtener llaves con DH1
-                    KeyPair parLlaves = Algoritmos.DiffieHellman1(); // Generar par de llaves
+                    KeyPair parLlaves = Algoritmos.servDiffieHellman1(); // Generar par de llaves
                     PublicKey dhPublica = parLlaves.getPublic(); // Obtener llave pública
-                    PrivateKey dhPrivada = parLlaves.getPrivate(); // Obtener llave privada
 
                     // Guardar llaves DH en atributo
                     this.parLlavesDH = parLlaves; 
@@ -102,8 +110,6 @@ public class ThreadServPrincipal extends Thread {
                     String firmaBase64 = Base64.getEncoder().encodeToString(firma); // Convertir firma a Base64
 
                     // Enviar P, G y G^x mod P al cliente firmado con llave pública RSA
-                    
-
                     escritor.println(p.toString()); // Enviar P
                     escritor.println(g.toString()); // Enviar G
                     escritor.println(Base64.getEncoder().encodeToString(dhPublica.getEncoded())); // Enviar G^x mod P
@@ -147,7 +153,7 @@ public class ThreadServPrincipal extends Thread {
                 e.printStackTrace();
             }
             
-            // Paso 11b.2: calcula  K_AB1 y MAC K_AB2 con digest y hmac
+            // Paso 11b.2: calcula  K_AB1 y MAC K_AB2 
             try {
                 byte[] llaveSimetricaBytes = llaveSimetrica.getEncoded(); // Obtener bytes de la llave simétrica
                 byte[] resultDigest = Algoritmos.Digest(llaveSimetricaBytes); // Calcular K_AB1 con digest
@@ -193,6 +199,7 @@ public class ThreadServPrincipal extends Thread {
             String idServicioCifrado = lector.readLine(); // Leer id de servicio 
             byte[] idServicioDecifrado = Algoritmos.AES(K_AB1, idServicioCifrado, iv, false); // Descifrar id de servicio
             String buscado = new String(idServicioDecifrado); // Convertir bytes a string
+            // TODO: falta mirar que no viene solo, llega idServicio;ip_cliente
 
                 //Verificar HMAC
             String hmacRecibido = lector.readLine(); // Leer HMAC recibido
@@ -209,7 +216,7 @@ public class ThreadServPrincipal extends Thread {
             for (int j = 0; j < servidores.size(); j++) { // Buscamos en la tabla de servicios completa
                 if (servidores.get(j).get(0).equals(buscado)) { // Hallar servicio buscado
 
-                    // Enviar ip y puerto del servidor
+                    // Enviar ip y puerto del servidor 
                     String ipServidor = servidores.get(j).get(2); // Obtener ip del servidor
                     String puertoServidor = servidores.get(j).get(3); // Obtener puerto del servidor
                     String envioIPPuerto = ipServidor + ";" + puertoServidor; // Crear string con ip y puerto

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 
 public class ServPrincipal {
     public static void main(String args[]) throws IOException {
+        
         ServerSocket ss = null;
         boolean continuar = true;
         ArrayList<ArrayList<String>> servidores = tablaServidores(); // Matriz almacena datos servidores

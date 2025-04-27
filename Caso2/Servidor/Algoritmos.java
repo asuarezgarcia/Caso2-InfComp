@@ -81,8 +81,8 @@ public class Algoritmos {
 
 
     // Diffie-Hellman
-    // Parte 1
-    public static KeyPair DiffieHellman1() throws Exception {
+    // Parte 1 serv
+    public static KeyPair servDiffieHellman1() throws Exception {
         // Generar parámetros
         AlgorithmParameterGenerator generador = AlgorithmParameterGenerator.getInstance("DH");
         generador.init(1024); // Tamaño de la clave en bits
@@ -99,7 +99,21 @@ public class Algoritmos {
         return parLlave; // Retornar la llave pública y privada
     }
 
-    // Parte 2
+    // Parte 1 cliente
+    public static KeyPair clienteDiffieHellman1(BigInteger p, BigInteger g) throws Exception {
+
+        // Crear los parámetros DH con P y G
+        DHParameterSpec dhSpec = new DHParameterSpec(p, g);
+        
+        // Generar el par de llaves
+        KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance("DH");
+        keyPairGen.initialize(dhSpec);
+        KeyPair parLlavesCliente = keyPairGen.generateKeyPair();
+        
+        return parLlavesCliente;
+    }
+
+    // Parte 2 
     public static SecretKey DiffieHellman2(PrivateKey llavePrivada, PublicKey llavePublicaRecibida) throws Exception {
         // Crear el acuerdo de claves Diffie-Hellman
         KeyAgreement acuerdo = KeyAgreement.getInstance("DH");
@@ -113,6 +127,8 @@ public class Algoritmos {
         // Generar la llave secreta compartida como un arreglo de bytes
         return acuerdo.generateSecret("SHA-512");
     }
+
+    
 
 
     // Digestion SHA-512
