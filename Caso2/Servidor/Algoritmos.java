@@ -155,31 +155,41 @@ public class Algoritmos {
         return iv;
     }
 
-    // Cifrar o descifrar texto con AES
-    public static byte[] AES(SecretKey llave, String texto, IvParameterSpec IV, boolean encrypt) { 
+    // Cifrar con AES
+    public static byte[] AES_Cifrado(SecretKey llave, String texto, IvParameterSpec IV) { 
          
         String PADDIG = "AES/CBC/PKCS5Padding"; 
 
-        try {
+        try { 
             Cipher cifrador = Cipher.getInstance(PADDIG); 
+            byte[] textoCifrado = texto.getBytes();
 
-            if (encrypt) {
-                byte[] textoCifrado;
-                cifrador.init(Cipher.ENCRYPT_MODE, llave, IV); // Cifrado
-                byte[] textoClaro = texto.getBytes("UTF-8"); // Convertir texto a bytes
-                return cifrador.doFinal(textoClaro); // Cifrar el texto claro
-
-            } else {
-                byte[] textoClaro = Base64.getDecoder().decode(texto); // Decodificar el texto cifrado
-                cifrador.init(Cipher.DECRYPT_MODE, llave, IV); // Descifrado
-                return cifrador.doFinal(textoClaro); // Descifrar el texto cifrado
-            }
-
-        } catch (Exception e) {
-            System.out.println("Error en AES: " + e.getMessage());
+            cifrador.init(Cipher.ENCRYPT_MODE, llave);
+            textoCifrado = cifrador.doFinal(textoCifrado);
+            return textoCifrado;
+        }catch (Exception e) {
+            System.out.println("Error al cifrar el texto: " + e.getMessage());
             return null;
         }
     } 
+    //Decifrar con AES 
+
+     public static byte[] AES_Decifrado(SecretKey llave, byte[] textoCifrado){ 
+        byte[] textoClaro; 
+        String PADDIG = "AES/CBC/PKCS5Padding"; 
+        try {
+            Cipher cifrador = Cipher.getInstance(PADDIG); 
+
+            cifrador.init(Cipher.DECRYPT_MODE, llave);
+            textoClaro = cifrador.doFinal(textoCifrado);
+        } catch (Exception e) {
+            System.out.println("Error al decifrar el texto: " + e.getMessage());
+            return null;
+        }
+         return textoClaro;
+    }
+    
+
 
     // Cifrado HMAC 
     public static byte[] calculoHMac(byte [] clave, byte[] texto) throws Exception { 

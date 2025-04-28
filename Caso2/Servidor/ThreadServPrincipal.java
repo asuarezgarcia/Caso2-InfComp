@@ -6,8 +6,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.math.BigInteger;
 import java.net.Socket;
-
-
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -180,7 +179,7 @@ public class ThreadServPrincipal extends Thread {
                 envioTabla += serv + ";"; // Agregar id al envio de la tabla
             }
             System.out.println("Tabla de servicios: " + envioTabla); // Imprimir tabla de servicios
-            byte[] cifrado = Algoritmos.AES(K_AB1, envioTabla, iv, true); // Cifrar id de servicio con AES
+            byte[] cifrado = Algoritmos.AES_Cifrado(K_AB1, envioTabla, iv); // Cifrar id de servicio con AES
             String envioTablaCifrado = Base64.getEncoder().encodeToString(cifrado); // Convertir id de servicio cifrado a Base64
             escritor.println(envioTablaCifrado); // Enviar id de servicio cifrado al cliente
             System.out.println("tabla de servicios enviada: " + envioTablaCifrado); // Imprimir id de servicio cifrado enviado
@@ -202,14 +201,17 @@ public class ThreadServPrincipal extends Thread {
             System.out.println("Id servicio recibido cifrado: " + idServicioCifrado); // Imprimir id de servicio cifrado recibido
 
                 // Decifrar id de servicio;ipCliente
-            byte[] idServicioDecifrado = Algoritmos.AES(K_AB1, idServicioCifrado, iv, false); // Descifrar id de servicio
+            byte[] idServicioCifradoB = idServicioCifrado.getBytes(StandardCharsets.UTF_8); // cambio de string a byte
+            byte[] idServicioDecifrado = Algoritmos.AES_Decifrado(K_AB1, idServicioCifradoB); // Descifrar id de servicio
             String buscado = new String(idServicioDecifrado, "UTF-8"); // Convertir bytes a string
             System.out.println("Id de servicio buscado: " + buscado);
             
                 // Separar id de servicio y ip_cliente
             String[] partes = buscado.split(";"); 
-            String idServicioCif = partes[0]; // Obtener id de servicio
-            byte[] idServ = Algoritmos.AES(K_AB1, buscado, iv, false); // Descifrar id de servicio con RSA
+            String idServicioCif = partes[0]; // Obtener id de servicio 
+            byte[] idServicioCif_B = idServicioCif.getBytes(StandardCharsets.UTF_8);
+            //byte[] buscado_B = buscado.getBytes(StandardCharsets.UTF_8);
+            byte[] idServ = Algoritmos.AES_Decifrado(K_AB1, idServicioCif_B); // Descifrar id de servicio con RSA
             String idServString = new String(idServ, "UTF-8"); // Convertir bytes a string
             System.out.println("Id de servicio descifrado: " + idServString); // Imprimir id de servicio descifrado
             String ipCliente = partes[1]; // Obtener ip_cliente
@@ -235,7 +237,7 @@ public class ThreadServPrincipal extends Thread {
                     String puertoServidor = servidores.get(j).get(3); // Obtener puerto del servidor
                     String envioIPPuerto = ipServidor + ";" + puertoServidor; // Crear string con ip y puerto
 
-                    byte [] Cifrado = Algoritmos.AES(K_AB1, envioIPPuerto, iv, true); // Cifrar ip
+                    byte [] Cifrado = Algoritmos.AES_Cifrado(K_AB1, envioIPPuerto, iv); // Cifrar ip
 
                     escritor.println(Base64.getEncoder().encodeToString(Cifrado)); // Enviar ip cifrada al cliente
                     System.out.println("Id de servicio correcto: " + buscado); // Imprimir id de servicio correcto

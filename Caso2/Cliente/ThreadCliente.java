@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -167,8 +168,9 @@ public class ThreadCliente extends Thread {
             // Paso 13b: Recibir tabla de servicios cifrada y verficar HMAC
                 // Leer tabla de servicios y decifrarla
             String Servicios = lector.readLine(); // Leer tabla de servicios cifrada
-            System.out.println("Tabla de servicios recibida: " + Servicios); // Imprimir tabla de servicios recibida
-            byte[] serviciosDecifrados = Algoritmos.AES(K_AB1, Servicios, iv, false); // Descifrar id de servicio
+            System.out.println("Tabla de servicios recibida: " + Servicios); // Imprimir tabla de servicios recibida 
+            byte[] Servicios_B = Servicios.getBytes(StandardCharsets.UTF_8);
+            byte[] serviciosDecifrados = Algoritmos.AES_Decifrado(K_AB1, Servicios_B); // Descifrar id de servicio 
             String serviciosString = Base64.getEncoder().encodeToString(serviciosDecifrados); // Convertir a string
             System.out.println("Tabla de servicios decifrada: " + serviciosString); // Imprimir tabla de servicios decifrada
 
@@ -204,7 +206,7 @@ public class ThreadCliente extends Thread {
             // Paso 14: Enviar id servicio + ip cliente cifrados
                 // Cifrar y enviar id de servicio al servidor + ipCliente
             String mensaje = idServicio + ";" + ipCliente;
-            byte[] mensajeCifrado = Algoritmos.AES(K_AB1, mensaje, iv, true); // Cifrar el mensaje 
+            byte[] mensajeCifrado = Algoritmos.AES_Cifrado(K_AB1, mensaje, iv); // Cifrar el mensaje 
             escritor.println(Base64.getEncoder().encodeToString(mensajeCifrado));
             System.out.println("idServicio + ipcliente enviados: " + Base64.getEncoder().encodeToString(mensajeCifrado)); // Imprimir mensaje cifrado enviado al servidor
 
@@ -219,8 +221,9 @@ public class ThreadCliente extends Thread {
 
             // Paso 17: Recibir ipServicio y Puerto, y verficar HMAC
                 // Leer ipServicio;Puerto cifrados
-            String recibido = lector.readLine(); // Leer tabla de servicios cifrada
-            byte[] recibDecifrado = Algoritmos.AES(K_AB1, recibido, iv, false); // Descifrar 
+            String recibido = lector.readLine(); // Leer tabla de servicios cifrada 
+            byte[] recibido_B = recibido.getBytes(StandardCharsets.UTF_8);
+            byte[] recibDecifrado = Algoritmos.AES_Decifrado(K_AB1, recibido_B); // Descifrar 
             String recibString = new String(recibDecifrado); // Convertir a string
 
                 // Escoger un servicio al azar
