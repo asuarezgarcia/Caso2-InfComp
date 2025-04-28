@@ -16,6 +16,9 @@ public class ServPrincipal {
         boolean continuar = true;
         ArrayList<ArrayList<String>> servidores = tablaServidores(); // Matriz almacena datos servidores
         int i = 0; // Contador para los hilos
+       long tiempoFirma = 0; 
+        long tiempoCifrado = 0; 
+        long tiempoVerificar = 0;
 
         // Generar llaves RSA
         Algoritmos.generarLlavesRSA(); 
@@ -35,7 +38,7 @@ public class ServPrincipal {
             System.out.println("Cliente conectado: " + socket.getInetAddress()); // IP de quien se conectó
 
             // Crear un nuevo hilo para manejar al cliente
-            new ThreadServPrincipal(socket, i).start();
+            new ThreadServPrincipal(socket, i, tiempoFirma,tiempoCifrado,tiempoVerificar).start();
             i++; // Incrementar contador hilos
         }
 

@@ -12,14 +12,18 @@ public class Clie {
         // Variables para el cliente
         Socket socket = null; 
         int idCli = 0; // Contador para los hilos
-        int numCli = 5;
+        int numCli = 5; 
+        long tiempoFirma = 0; 
+        long tiempoCifrado = 0; 
+        long tiempoVerificar = 0;
+
         
         try {
             //crear el socket en el lado del cliente
-            for (int i = 0; i <= numCli; i++) {
+            for (int i = 0; i < numCli+1; i++) {
                 socket = new Socket(SERVIDOR, PUERTO); 
                 String ipCliente = "3"; 
-                new ThreadCliente(socket, ipCliente, idCli).start(); // Crear un nuevo hilo para manejar al cliente
+                new ThreadCliente(socket, ipCliente, idCli, tiempoFirma,tiempoCifrado,tiempoVerificar).start(); // Crear un nuevo hilo para manejar al cliente
                 idCli ++;      
                 System.out.println("Cliente" + idCli + " conectado"); 
             }
@@ -27,6 +31,7 @@ public class Clie {
             e.printStackTrace(); 
             System.err.println("Error al conectar el cliente: " + e.getMessage());
         } 
+
 
     }
 }

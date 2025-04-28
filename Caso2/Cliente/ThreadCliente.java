@@ -35,13 +35,19 @@ public class ThreadCliente extends Thread {
     private SecretKey K_AB1 = null;
     private byte[] K_AB2 = null;
     private String ipCliente = null;
-    private int idCli = 0; // Contador para los hilos
+    private int idCli = 0; // Contador para los hilos 
+    private long tiempoFirma = 0; 
+    private long tiempoCifrado = 0;
+    private long tiempoVerificar = 0;
 
     // Constructor
-    public ThreadCliente(Socket socket, String ipCliente, int idCli) {
+    public ThreadCliente(Socket socket, String ipCliente, int idCli, long  tf, long  tc, long tv) {
         this.socket = socket; // Inicializar el socket del cliente
         this.ipCliente = ipCliente; // Inicializar la IP del cliente
-        this.idCli = idCli; // Inicializar el id del cliente
+        this.idCli = idCli; // Inicializar el id del cliente 
+        this.tiempoFirma = tf; // Inicializar el tiempo de firma
+        this.tiempoCifrado = tc; // Inicializar el tiempo de cifrado
+        this.tiempoVerificar = tv; // Inicializar el tiempo de verificación
     }
 
     // run
@@ -91,10 +97,9 @@ public class ThreadCliente extends Thread {
 
             try{
                 //Sacar hash del mensaje usado para firmar
-                String mensajeRecibido = p + ';' + g + ';' + gxModP;
+                String mensajeRecibido = p + ';' + g + ';' + gxModP; 
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
                 byte[] hashCalculado = digest.digest(mensajeRecibido.getBytes("UTF-8")); // Calcular hash del mensaje recibido
-                
                     //Decifrar firma
                 byte[] firmaBytes = Base64.getDecoder().decode(firmaBase64); // Decodificar la firma de Base64
                 byte[] hashDescifrado = Algoritmos.RSA(llavePublica, firmaBytes, false); // Descifrar la firma con la llave pública
@@ -170,13 +175,16 @@ public class ThreadCliente extends Thread {
             
                 // Calcular HMAC localmente
                 byte[] hmacRecibidoBytes = Base64.getDecoder().decode(hmacRecibido); // Decodificar HMAC recibido
-                byte[] serviciosDecifradosBytes = serviciosDecifrados.getBytes(StandardCharsets.UTF_8); // Convertir datos descifrados a bytes                byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, serviciosDecifradosBytes); // Calcular HMAC localmente
+                byte[] serviciosDecifradosBytes = serviciosDecifrados.getBytes(StandardCharsets.UTF_8); // Convertir datos descifrados a bytes
+                long tiempoInicioV = System.nanoTime(); // Iniciar temporizador
                 byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, serviciosDecifradosBytes); // Calcular HMAC localmente
                 
                 // Verificar HMAC
                 if(!Algoritmos.verificar(hmacRecibidoBytes, hmacCalculado)) { // Verificar HMAC
                     return; // Terminar el hilo si hay error
-                }
+                } 
+                long tiempoFinV = System.nanoTime(); // Detener temporizador
+                tiempoVerificar += tiempoFinV - tiempoInicioV; // Calcular tiempo de verificación
             } catch (Exception e) {
                 e.printStackTrace(); // Manejar excepciones
             } 
@@ -187,7 +195,7 @@ public class ThreadCliente extends Thread {
                 
                 // Generar id de servicio aleatorio
             Random randomId = new Random(); // Generar id de servicio aleatorio
-            int idServicio = randomId.nextInt(1,3); // Número aleatorio entre 1 y 3
+            int idServicio = randomId.nextInt(2) + 1; // Número aleatorio entre 1 y 3
             String idServicioStr = "S" + String.valueOf(idServicio); // Convertir id de servicio a string
 
             try{
@@ -218,7 +226,8 @@ public class ThreadCliente extends Thread {
 
                 // Calular HMAC localmente
                 byte[] hmacRecibidoBytes = Base64.getDecoder().decode(hmacRecibido); // Decodificar HMAC recibido
-                byte[] recibDecifradoBytes = recibDecifrado.getBytes(StandardCharsets.UTF_8); // Convertir datos descifrados a bytes
+                byte[] recibDecifradoBytes = recibDecifrado.getBytes(StandardCharsets.UTF_8); // Convertir datos descifrados a bytes 
+                long tiempoInicioV = System.nanoTime(); // Iniciar temporizador
                 byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, recibDecifradoBytes); // Calcular HMAC localmente
                 
                 //Verificar HMAC
@@ -227,7 +236,11 @@ public class ThreadCliente extends Thread {
                 } else {
                     System.out.println("HMAC 3 incorrecto"); // Imprimir HMAC incorrecto
                     return; // Terminar el hilo si hay error
-                }
+                } 
+                long tiempoFinV = System.nanoTime(); // Detener temporizador
+                tiempoVerificar += tiempoFinV - tiempoInicioV; // Calcular tiempo de verificación
+
+
             }
             catch (Exception e) {
                 e.printStackTrace(); // Manejar excepciones
@@ -241,6 +254,7 @@ public class ThreadCliente extends Thread {
 
         } catch (IOException e) {
             e.printStackTrace();
-        }
-    }
+        } 
+    System.out.println("Cliente " + " " + idCli +" " + "su Tiempo de Verificacion es : " + " " + tiempoVerificar); 
+    } 
 }

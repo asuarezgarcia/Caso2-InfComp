@@ -31,12 +31,18 @@ public class ThreadServPrincipal extends Thread {
     private byte[] llaveSimetrica = null; // Guarda llave simétrica AES
     private SecretKey K_AB1 = null; // Guarda K_AB1
     private byte[] K_AB2 = null; // Guarda K_AB2
-    private IvParameterSpec iv = null; // Guarda IV para AES
+    private IvParameterSpec iv = null; // Guarda IV para AES 
+    private long tiempoFirma; // Tiempo de firma
+    private long tiempoCifrado; // Tiempo de cifrado
+    private long tiempoVerificar; // Tiempo de verificación
 
     // Constructor
-    public ThreadServPrincipal(Socket socket, int id) {
+    public ThreadServPrincipal(Socket socket, int id, long tiempoFirma, long tiempoCifrado, long tiempoVerificar) {
         this.sktCli = socket;
         this.id = id;
+        this.tiempoFirma = tiempoFirma; // Inicializar tiempo de firma
+        this.tiempoCifrado = tiempoCifrado; // Inicializar tiempo de cifrado
+        this.tiempoVerificar = tiempoVerificar; // Inicializar tiempo de verificación
     }
 
     // run
@@ -98,10 +104,12 @@ public class ThreadServPrincipal extends Thread {
                 String enviar = p + ";" + g + ";" + Gx; // Crear string con G, P y G^x
 
                 // Firmar mensaje
+                long tiempoInicioF = System.nanoTime(); // Iniciar tiempo de firma
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
                 byte[] hash = digest.digest(enviar.getBytes()); // Calcular hash del mensaje
-
-                byte[] firma = Algoritmos.RSA(llavePrivada, hash, true); // Firmar el mensaje con la llave privada
+                byte[] firma = Algoritmos.RSA(llavePrivada, hash, true); // Firmar el mensaje con la llave privada 
+                long tiempoFinF = System.nanoTime(); // Terminar tiempo de firma 
+                tiempoFirma += tiempoFinF - tiempoInicioF; // Calcular tiempo de firma 
                 String firmaBase64 = Base64.getEncoder().encodeToString(firma); // Convertir firma a Base64
 
                 // Enviar P, G y G^x mod P al cliente firmado con llave pública RSA
@@ -173,14 +181,16 @@ public class ThreadServPrincipal extends Thread {
                 String serv = servidores.get(i).get(0); // Agregar id de servicio a la tabla
                 envioTabla += serv + ";"; // Agregar id al envio de la tabla
             }
-
+            long tiempoInicioS = System.nanoTime(); // Iniciar tiempo de cifrado
             try {
                 String cifrado = Algoritmos.AES_Cifrado(envioTabla, K_AB1, iv); // Cifrar id de servicio con AES
                 escritor.println(cifrado); // Enviar id de servicio cifrado al cliente
             } catch (Exception e) {
                 e.printStackTrace();
                 throw new RuntimeException("Error al cifrar la tabla de servicios", e);
-            }
+            } 
+            long tiempoFinS = System.nanoTime(); // Terminar tiempo de cifrado 
+            tiempoCifrado += tiempoFinS - tiempoInicioS; // Calcular tiempo de cifrado
 
                 // Enviar HMAC
             byte[] TablaBytes = envioTabla.getBytes(); // Pasar bytes de la tabla
@@ -214,10 +224,13 @@ public class ThreadServPrincipal extends Thread {
                 byte[] servIpDecifradosBytes = servIp.getBytes(); // Convertir datos descifrados a bytes     
                 byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, servIpDecifradosBytes); // Calcular HMAC localmente
                 
-                //Verificar HMAC
+                //Verificar HMAC 
+                long tiempoInicioVerificar = System.nanoTime(); // Iniciar tiempo de verificación
                 if(!Algoritmos.verificar(hmacRecibidoBytes, hmacCalculado)) { // Verificar HMAC
                     return; // Terminar el hilo si hay error
-                }
+                } 
+                long tiempoFinVerificar = System.nanoTime(); // Terminar tiempo de verificación 
+                tiempoVerificar += tiempoFinVerificar - tiempoInicioVerificar; // Calcular tiempo de verificación
             } catch (Exception e) {
                 e.printStackTrace();
                 throw new RuntimeException("Error al descifrar el id de servicio", e);
@@ -270,7 +283,10 @@ public class ThreadServPrincipal extends Thread {
             sktCli.close();
         } catch (IOException e) {
             e.printStackTrace();
-        }
+        } 
+        System.out.println("Servidor " + " " + id +" " + "su Tiempo de Verificacion es : " + " " + tiempoVerificar); 
+        System.out.println("Servidor " + " " + id +" " + "su Tiempo de Cifrado es : " + " " + tiempoCifrado); 
+        System.out.println("Servidor " + " " + id +" " + "su Tiempo de Firma es : " + " " + tiempoFirma);
     }
 
 }
