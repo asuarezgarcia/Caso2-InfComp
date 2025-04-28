@@ -78,16 +78,13 @@ public class ThreadCliente extends Thread {
             byte[] retoBytes = retoString.getBytes(); // Convertir reto a bytes
             if (Algoritmos.verificar(retoBytes, decifrado)) { // Verificar si el reto coincide
                 escritor.println("OK"); // Enviar OK al servidor
-                System.out.println("Reto correcto"); // Imprimir reto correcto
             } else {
                 escritor.println("ERROR"); // Enviar ERROR al servidor
-                System.out.println("Reto incorrecto"); // Imprimir reto incorrecto
                 return; // Salir si el reto no coincide
             }
 
             //Paso 9 y 10: Recibo G,P,G^x mod p, y la firma. Verifico la firma y mando OK o ERROR
             String p = lector.readLine(); // Leer G
-            System.out.println("P recibido: " + p); // Imprimir P
             String g = lector.readLine(); // Leer P
             String gxModP = lector.readLine(); // Leer G^x mod p
             String firmaBase64 = lector.readLine(); // Leer firma del servidor
@@ -124,13 +121,11 @@ public class ThreadCliente extends Thread {
                 Key llavePublicaCliente = llavesDH.getPublic(); // Obtener llave privada del cliente   
                 String gyModPBase64 = Base64.getEncoder().encodeToString(llavePublicaCliente.getEncoded());
                 escritor.println(gyModPBase64); // Enviar G^y mod P al servidor
-                System.out.println("Llave pública enviada al servidor: " + gyModPBase64); // Imprimir llave pública enviada al servidor     
 
                     // Reconstruir llave pública servidor
                 byte[] gxBytes = Base64.getDecoder().decode(gxModP); // Decodificar G^x mod P
                 KeyFactory keyFactory = KeyFactory.getInstance("DH");
                 PublicKey llavePublicaServidor = keyFactory.generatePublic(new X509EncodedKeySpec(gxBytes));
-                System.out.println("Llave pública del servidor reconstruida.");
 
                     // Generar llave privada              
                 byte [] llaveSimetrica = Algoritmos.DiffieHellman2(llavesDH.getPrivate(), llavePublicaServidor);
@@ -160,7 +155,6 @@ public class ThreadCliente extends Thread {
                 this.iv = new IvParameterSpec(iv);
                 String ivBase64 = Base64.getEncoder().encodeToString(iv); // Convertir IV a Base64
                 escritor.println(ivBase64);
-                System.out.println("IV enviado al servidor: " + Base64.getEncoder().encodeToString(iv)); // Imprimir IV enviado al servidor
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -168,78 +162,77 @@ public class ThreadCliente extends Thread {
             // Paso 13b: Recibir tabla de servicios cifrada y verficar HMAC
                 // Leer tabla de servicios y decifrarla
             String Servicios = lector.readLine(); // Leer tabla de servicios cifrada
-            System.out.println("Tabla de servicios recibida: " + Servicios); // Imprimir tabla de servicios recibida 
-            byte[] Servicios_B = Servicios.getBytes(StandardCharsets.UTF_8);
-            byte[] serviciosDecifrados = Algoritmos.AES_Decifrado(K_AB1, Servicios_B); // Descifrar id de servicio 
-            String serviciosString = Base64.getEncoder().encodeToString(serviciosDecifrados); // Convertir a string
-            System.out.println("Tabla de servicios decifrada: " + serviciosString); // Imprimir tabla de servicios decifrada
-
-                // Escoger un servicio al azar
-            List<String> listaServicios = List.of(serviciosString.split(";")); // Separar los servicios por ";"
-            Random random1 = new Random(); // Crear objeto Random para seleccionar un servicio al azar
-            int ran = random1.nextInt(listaServicios.size()); // Generar índice aleatorio
-            String idServicio = listaServicios.get(ran); // Obtener servicio
-            System.out.println("Servicio elegido: " + idServicio); // Imprimir servicio elegido
-                
+            try{
+                String serviciosDecifrados = Algoritmos.AES_Decifrado(Servicios, K_AB1, iv); // Decifrar tabla de servicios
+             
                 //Verificar HMAC
-            String hmacRecibido = lector.readLine(); // Leer HMAC recibido
-            System.out.println("HMAC recibido: " + hmacRecibido); // Imprimir HMAC recibido
-            byte[] hmacRecibidoBytes = Base64.getDecoder().decode(hmacRecibido); // Decodificar HMAC recibido
+                String hmacRecibido = lector.readLine(); // Leer HMAC recibido
             
                 // Calcular HMAC localmente
-            try {
-                byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, serviciosDecifrados); // Calcular HMAC localmente
+                byte[] hmacRecibidoBytes = Base64.getDecoder().decode(hmacRecibido); // Decodificar HMAC recibido
+                byte[] serviciosDecifradosBytes = serviciosDecifrados.getBytes(StandardCharsets.UTF_8); // Convertir datos descifrados a bytes                byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, serviciosDecifradosBytes); // Calcular HMAC localmente
+                byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, serviciosDecifradosBytes); // Calcular HMAC localmente
                 
                 // Verificar HMAC
-                if(Algoritmos.verificar(hmacRecibidoBytes, hmacCalculado)) { // Verificar HMAC
-                    System.out.println("HMAC 1 correcto"); // Imprimir HMAC correcto 
-                } else {
-                    System.out.println("HMAC 1 incorrecto"); // Imprimir HMAC incorrecto 
+                if(!Algoritmos.verificar(hmacRecibidoBytes, hmacCalculado)) { // Verificar HMAC
                     return; // Terminar el hilo si hay error
-            }
+                }
             } catch (Exception e) {
                 e.printStackTrace(); // Manejar excepciones
-            }
+            } 
 
                 
-
+            
             // Paso 14: Enviar id servicio + ip cliente cifrados
+                
+                // Generar id de servicio aleatorio
+            Random randomId = new Random(); // Generar id de servicio aleatorio
+            int idServicio = randomId.nextInt(1,3); // Número aleatorio entre 1 y 3
+            String idServicioStr = "S" + String.valueOf(idServicio); // Convertir id de servicio a string
+
+            try{
                 // Cifrar y enviar id de servicio al servidor + ipCliente
-            String mensaje = idServicio + ";" + ipCliente;
-            byte[] mensajeCifrado = Algoritmos.AES_Cifrado(K_AB1, mensaje, iv); // Cifrar el mensaje 
-            escritor.println(Base64.getEncoder().encodeToString(mensajeCifrado));
-            System.out.println("idServicio + ipcliente enviados: " + Base64.getEncoder().encodeToString(mensajeCifrado)); // Imprimir mensaje cifrado enviado al servidor
+                String mensaje = idServicioStr + ";" + ipCliente;
+                String mensajeCifrado = Algoritmos.AES_Cifrado(mensaje, K_AB1, iv); // Cifrar el mensaje 
+                escritor.println(mensajeCifrado);
 
                 // Enviar HMAC al servidor
-            try{
-                byte[] hmac = Algoritmos.calculoHMac(K_AB2, mensajeCifrado); // Calcular HMAC
-                escritor.println(Base64.getEncoder().encodeToString(hmac)); // Enviar HMAC al cliente
-                System.out.println("HMAC 2 enviado: " + Base64.getEncoder().encodeToString(hmac)); // Imprimir HMAC enviado al servidor
+                byte[] mensajeCifradoBytes = mensaje.getBytes(); // Pasar bytes de la tabla
+                byte[] hmac = Algoritmos.calculoHMac(K_AB2, mensajeCifradoBytes); // Calcular HMAC
+                String hmacBase64 = Base64.getEncoder().encodeToString(hmac); // Convertir HMAC a Base64
+                escritor.println(hmacBase64); // Enviar HMAC al cliente
             } catch (Exception e) {
                 e.printStackTrace(); // Manejar excepciones
             }
-
+            
             // Paso 17: Recibir ipServicio y Puerto, y verficar HMAC
                 // Leer ipServicio;Puerto cifrados
             String recibido = lector.readLine(); // Leer tabla de servicios cifrada 
-            byte[] recibido_B = recibido.getBytes(StandardCharsets.UTF_8);
-            byte[] recibDecifrado = Algoritmos.AES_Decifrado(K_AB1, recibido_B); // Descifrar 
-            String recibString = new String(recibDecifrado); // Convertir a string
+            
+            try{
+                // Leer ipServicio;Puerto cifrados y decifrarlo
+                String recibDecifrado = Algoritmos.AES_Decifrado(recibido, K_AB1, iv); // Descifrar 
 
-                // Escoger un servicio al azar
-            List<String> Info = List.of(recibString.split(";")); // Separar los servicios por ";"
+                // Leer HMAC
+                String hmacRecibido = lector.readLine(); // Leer HMAC recibido
 
+                // Calular HMAC localmente
+                byte[] hmacRecibidoBytes = Base64.getDecoder().decode(hmacRecibido); // Decodificar HMAC recibido
+                byte[] recibDecifradoBytes = recibDecifrado.getBytes(StandardCharsets.UTF_8); // Convertir datos descifrados a bytes
+                byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, recibDecifradoBytes); // Calcular HMAC localmente
+                
                 //Verificar HMAC
-            String hmacRecib = lector.readLine(); // Leer HMAC recibido
-            byte[] hmacRecibBytes = Base64.getDecoder().decode(hmacRecib); // Decodificar HMAC recibido
-            if(Algoritmos.verificar(hmacRecibBytes, K_AB2)) { // Verificar HMAC
-                // Paso 18: Respuesta final
-                escritor.println("OK"); 
-                System.out.println("HMAC 3 correcto"); // Imprimir HMAC correcto 
-            } else {
-                System.out.println("HMAC 3 incorrecto"); // Imprimir HMAC incorrecto 
-                return; // Terminar el hilo si hay error
-            }  
+                if(Algoritmos.verificar(hmacRecibidoBytes, hmacCalculado)) { // Verificar HMAC
+                    System.out.println("HMAC 3 correcto"); // Imprimir HMAC correcto 
+                } else {
+                    System.out.println("HMAC 3 incorrecto"); // Imprimir HMAC incorrecto
+                    return; // Terminar el hilo si hay error
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace(); // Manejar excepciones
+            }
+            
             
             // Se cierran flujos y socket
             lector.close();

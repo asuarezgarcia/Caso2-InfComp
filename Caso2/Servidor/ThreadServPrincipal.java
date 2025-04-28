@@ -71,11 +71,9 @@ public class ThreadServPrincipal extends Thread {
             byte[] Rta = Algoritmos.RSA(llavePrivada, reto.getBytes(), true); // Cifrar el reto con la llave privada
             String rptBase64 = Base64.getEncoder().encodeToString(Rta); // Convertir reto cifrado a Base64
             escritor.println(rptBase64); // Enviar el reto cifrado al cliente
-            System.out.println("Reto cifrado enviado al cliente"); // Imprimir reto cifrado enviado
 
             // Recibir ok o error
             String respuesta1 = lector.readLine(); // Leer respuesta del cliente
-            System.out.println("Respuesta del cliente: " + respuesta1); // Imprimir respuesta del cliente
             if (respuesta1.equals("ERROR")) { // Si la respuesta es Error
                 System.out.println("Error en la conexión, cerrando el hilo."); // Imprimir error
                 return; // Terminar el hilo si hay error
@@ -111,8 +109,6 @@ public class ThreadServPrincipal extends Thread {
                 escritor.println(g.toString()); // Enviar G
                 escritor.println(Base64.getEncoder().encodeToString(dhPublica.getEncoded())); // Enviar G^x mod P
                 escritor.println(firmaBase64); // Enviar firma
-                System.out.println("Valores enviados al cliente: P, G, G^x mod P");
-
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -132,7 +128,6 @@ public class ThreadServPrincipal extends Thread {
             byte[] gYBytes = Base64.getDecoder().decode(gY); // Decodificar G^y de Base64
 
             String IV = lector.readLine(); // Leer IV del cliente
-            System.out.println("IV recibido: " + IV); // Imprimir IV recibido
             byte[] ivBytes = Base64.getDecoder().decode(IV); // Decodificar IV de Base64
             this.iv = new IvParameterSpec(ivBytes);
 
@@ -178,81 +173,83 @@ public class ThreadServPrincipal extends Thread {
                 String serv = servidores.get(i).get(0); // Agregar id de servicio a la tabla
                 envioTabla += serv + ";"; // Agregar id al envio de la tabla
             }
-            System.out.println("Tabla de servicios: " + envioTabla); // Imprimir tabla de servicios
-            byte[] cifrado = Algoritmos.AES_Cifrado(K_AB1, envioTabla, iv); // Cifrar id de servicio con AES
-            String envioTablaCifrado = Base64.getEncoder().encodeToString(cifrado); // Convertir id de servicio cifrado a Base64
-            escritor.println(envioTablaCifrado); // Enviar id de servicio cifrado al cliente
-            System.out.println("tabla de servicios enviada: " + envioTablaCifrado); // Imprimir id de servicio cifrado enviado
+
+            try {
+                String cifrado = Algoritmos.AES_Cifrado(envioTabla, K_AB1, iv); // Cifrar id de servicio con AES
+                escritor.println(cifrado); // Enviar id de servicio cifrado al cliente
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("Error al cifrar la tabla de servicios", e);
+            }
 
                 // Enviar HMAC
             byte[] TablaBytes = envioTabla.getBytes(); // Pasar bytes de la tabla
             try {
                 byte[] hmac = Algoritmos.calculoHMac(K_AB2, TablaBytes); // Calcular HMAC 
-                escritor.println(Base64.getEncoder().encodeToString(hmac)); // Enviar HMAC al cliente
-                System.out.println("HMAC enviado: " + Base64.getEncoder().encodeToString(hmac)); // Imprimir HMAC enviado
+                String hmacBase64 = Base64.getEncoder().encodeToString(hmac); // Convertir HMAC a Base64
+                escritor.println(hmacBase64); // Enviar HMAC al cliente
             } catch (Exception e) {
                 e.printStackTrace();
                 throw new RuntimeException("Error al calcular HMAC del id de servicio", e);
             }
         
-
+            
             // Paso 15: Verifica HMAC; recibe C(K_AB1, id_servicio + ip_cliente) y HMAC(K_AB2, id_servicio + ip_cliente)
             String idServicioCifrado = lector.readLine(); // Leer id de servicio 
-            System.out.println("Id servicio recibido cifrado: " + idServicioCifrado); // Imprimir id de servicio cifrado recibido
 
-                // Decifrar id de servicio;ipCliente
-            byte[] idServicioCifradoB = idServicioCifrado.getBytes(StandardCharsets.UTF_8); // cambio de string a byte
-            byte[] idServicioDecifrado = Algoritmos.AES_Decifrado(K_AB1, idServicioCifradoB); // Descifrar id de servicio
-            String buscado = new String(idServicioDecifrado, "UTF-8"); // Convertir bytes a string
-            System.out.println("Id de servicio buscado: " + buscado);
-            
+            String serv = ""; // Para guardar el id de servicio buscado
+            try{
+                // Descifrar id de servicio
+                String servIp = Algoritmos.AES_Decifrado(idServicioCifrado, K_AB1, iv); // Descifrar id de servicio
+                
                 // Separar id de servicio y ip_cliente
-            String[] partes = buscado.split(";"); 
-            String idServicioCif = partes[0]; // Obtener id de servicio 
-            byte[] idServicioCif_B = idServicioCif.getBytes(StandardCharsets.UTF_8);
-            //byte[] buscado_B = buscado.getBytes(StandardCharsets.UTF_8);
-            byte[] idServ = Algoritmos.AES_Decifrado(K_AB1, idServicioCif_B); // Descifrar id de servicio con RSA
-            String idServString = new String(idServ, "UTF-8"); // Convertir bytes a string
-            System.out.println("Id de servicio descifrado: " + idServString); // Imprimir id de servicio descifrado
-            String ipCliente = partes[1]; // Obtener ip_cliente
-            System.out.println("Ip cliente: " + ipCliente); // Imprimir ip_cliente
-            
+                String[] partes = servIp.split(";"); 
+                String idServ = partes[0]; // Obtener id de servicio
+                serv = idServ; // Guardar id
+
+                // Calcular HMAC localmente
+                String hmacRecibido = lector.readLine(); // Leer HMAC recibido
+
+                byte[] hmacRecibidoBytes = Base64.getDecoder().decode(hmacRecibido); // Decodificar HMAC recibido
+                byte[] servIpDecifradosBytes = servIp.getBytes(); // Convertir datos descifrados a bytes     
+                byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, servIpDecifradosBytes); // Calcular HMAC localmente
+                
                 //Verificar HMAC
-            String hmacRecibido = lector.readLine(); // Leer HMAC recibido
-            byte[] hmacRecibidoBytes = Base64.getDecoder().decode(hmacRecibido); // Decodificar HMAC recibido
-            if(Algoritmos.verificar(hmacRecibidoBytes, K_AB2)) { // Verificar HMAC
-                System.out.println("HMAC correcto"); // Imprimir HMAC correcto 
-            } else {
-                System.out.println("HMAC incorrecto"); // Imprimir HMAC incorrecto #TODO debería haber algo que termine la sesión
-                return; // Terminar el hilo si hay error
+                if(!Algoritmos.verificar(hmacRecibidoBytes, hmacCalculado)) { // Verificar HMAC
+                    return; // Terminar el hilo si hay error
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("Error al descifrar el id de servicio", e);
             }
 
+            
             // Paso 16: Envía C(K_AB1, ip_servidor + puerto_servidor) y HMAC(K_AB2, ip_servidor + puerto_servidor)
                 // Enviar ip y puerto
             for (int j = 0; j < servidores.size(); j++) { // Buscamos en la tabla de servicios completa
-                if (servidores.get(j).get(0).equals(buscado)) { // Hallar servicio buscado
+                if (servidores.get(j).get(0).equals(serv)) { // Hallar servicio buscado
 
-                    // Enviar ip y puerto del servidor 
+                    // Obtener ip y puerto del servidor, y juntarlos
                     String ipServidor = servidores.get(j).get(2); // Obtener ip del servidor
                     String puertoServidor = servidores.get(j).get(3); // Obtener puerto del servidor
                     String envioIPPuerto = ipServidor + ";" + puertoServidor; // Crear string con ip y puerto
 
-                    byte [] Cifrado = Algoritmos.AES_Cifrado(K_AB1, envioIPPuerto, iv); // Cifrar ip
-
-                    escritor.println(Base64.getEncoder().encodeToString(Cifrado)); // Enviar ip cifrada al cliente
-                    System.out.println("Id de servicio correcto: " + buscado); // Imprimir id de servicio correcto
-
-                    // Enviar HMAC
                     try {
-                        byte[] envioIPPuertoBytes = envioIPPuerto.getBytes(); // Pasar envioi a bytes
-                        byte[] hmac = Algoritmos.calculoHMac(K_AB2, envioIPPuertoBytes); // Calcular HMAC 
-                        escritor.println(Base64.getEncoder().encodeToString(hmac)); // Enviar HMAC al cliente
+                        // Cifrar AES
+                        String Cifrado = Algoritmos.AES_Cifrado(envioIPPuerto, K_AB1 , iv); // Cifrar ip
+
+                        escritor.println(Cifrado); // Enviar ip cifrada al cliente
+
+                        // Enviar HMAC
+                            byte[] envioIPPuertoBytes = envioIPPuerto.getBytes(); // Pasar envioi a bytes
+                            byte[] hmac = Algoritmos.calculoHMac(K_AB2, envioIPPuertoBytes); // Calcular HMAC 
+                            String hmacBase64 = Base64.getEncoder().encodeToString(hmac); // Convertir HMAC a Base64
+                            escritor.println(hmacBase64); // Enviar HMAC al cliente
+                            System.out.println("HMAC 3 enviado: " + hmacBase64); // Imprimir HMAC enviado
                     } catch (Exception e) {
                         e.printStackTrace();
                         throw new RuntimeException("Error al calcular HMAC de la ip y puerto", e);
-                    }    
-
-                    break;
+                    }
                 }    
                 break;
             }

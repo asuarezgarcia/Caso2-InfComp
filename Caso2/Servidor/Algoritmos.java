@@ -2,6 +2,7 @@ package Caso2.Servidor;
 
 import java.io.*;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Base64;
 
@@ -154,42 +155,21 @@ public class Algoritmos {
         random.nextBytes(iv);
         return iv;
     }
-
-    // Cifrar con AES
-    public static byte[] AES_Cifrado(SecretKey llave, String texto, IvParameterSpec IV) { 
-         
-        String PADDIG = "AES/CBC/PKCS5Padding"; 
-
-        try { 
-            Cipher cifrador = Cipher.getInstance(PADDIG); 
-            byte[] textoCifrado = texto.getBytes();
-
-            cifrador.init(Cipher.ENCRYPT_MODE, llave);
-            textoCifrado = cifrador.doFinal(textoCifrado);
-            return textoCifrado;
-        }catch (Exception e) {
-            System.out.println("Error al cifrar el texto: " + e.getMessage());
-            return null;
-        }
-    } 
-    //Decifrar con AES 
-
-     public static byte[] AES_Decifrado(SecretKey llave, byte[] textoCifrado){ 
-        byte[] textoClaro; 
-        String PADDIG = "AES/CBC/PKCS5Padding"; 
-        try {
-            Cipher cifrador = Cipher.getInstance(PADDIG); 
-
-            cifrador.init(Cipher.DECRYPT_MODE, llave);
-            textoClaro = cifrador.doFinal(textoCifrado);
-        } catch (Exception e) {
-            System.out.println("Error al decifrar el texto: " + e.getMessage());
-            return null;
-        }
-         return textoClaro;
-    }
     
+    public static String AES_Cifrado(String mensaje, SecretKey clave, IvParameterSpec iv) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, clave, iv);
+        byte[] cifrado = cipher.doFinal(mensaje.getBytes());
+        return Base64.getEncoder().encodeToString(cifrado);
+    }
 
+    public static String AES_Decifrado(String textoCifrado, SecretKey clave, IvParameterSpec iv) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, clave, iv);
+        byte[] decodificado = Base64.getDecoder().decode(textoCifrado);
+        byte[] descifrado = cipher.doFinal(decodificado);
+        return new String(descifrado, StandardCharsets.UTF_8);
+    }
 
     // Cifrado HMAC 
     public static byte[] calculoHMac(byte [] clave, byte[] texto) throws Exception { 
@@ -197,9 +177,9 @@ public class Algoritmos {
         SecretKeySpec secretKey = new SecretKeySpec(clave, algoritmo);  // Crear clave secreta
         Mac mac = Mac.getInstance(algoritmo); // Crear objeto Mac 
         mac.init(secretKey); // Inicializar el objeto Mac con la clave secreta 
-        byte[] hmac = mac.doFinal(texto); // Calcular HMAC 
-        return hmac; // Retornar el HMAC calculado
+        return mac.doFinal(texto); // Calcular HMAC 
     }
+    
 
 
     // Verificar 2 números

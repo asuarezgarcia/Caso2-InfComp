@@ -9,15 +9,14 @@ public class Clie {
 
     public static void main(String args[]) throws Exception {
         
-        
         // Variables para el cliente
         Socket socket = null; 
         int idCli = 0; // Contador para los hilos
-        int numCli = 1;
+        int numCli = 5;
         
         try {
             //crear el socket en el lado del cliente
-            for (int i = 0; i < numCli; i++) {
+            for (int i = 0; i <= numCli; i++) {
                 socket = new Socket(SERVIDOR, PUERTO); 
                 String ipCliente = "3"; 
                 new ThreadCliente(socket, ipCliente, idCli).start(); // Crear un nuevo hilo para manejar al cliente
