@@ -60,6 +60,7 @@ public class ServPrincipal {
                 barrier = new CyclicBarrier(numClientes, () -> {
                     // Acción cuando todos los hilos terminen
                     imprimirTiempos();
+                    System.out.println(numClientes);
                     numClientes = 0; // Reiniciar el contador de clientes
                     System.out.println("Fin del servidor principal.");
                 });

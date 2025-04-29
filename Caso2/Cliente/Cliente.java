@@ -14,8 +14,8 @@ public class Cliente {
         Socket socket = null; 
         int idCli = 1; // Contador para los hilos
 
-        int numCli = 1; // #TODO este número se cambia para probar el cliente con diferentes números de clientes
-        int secuencias = 32; // #TODO este número se cambia para probar secuencialmente
+        int numCli = 4; // #TODO este número se cambia para probar el cliente con diferentes números de clientes
+        int secuencias = 1; // #TODO este número se cambia para probar secuencialmente
 
         /* TODO notas de cómo correr los escenarios
         "numCli" es la cantidad de clientes que corre AL TIEMPO; para probar los casos del escenario 2, se modifica este valore y "secuencias" queda en 1
