@@ -35,19 +35,13 @@ public class ThreadCliente extends Thread {
     private SecretKey K_AB1 = null;
     private byte[] K_AB2 = null;
     private String ipCliente = null;
-    private int idCli = 0; // Contador para los hilos 
-    private long tiempoFirma = 0; 
-    private long tiempoCifrado = 0;
-    private long tiempoVerificar = 0;
+    private int idCli = 1; // Contador para los hilos 
 
     // Constructor
-    public ThreadCliente(Socket socket, String ipCliente, int idCli, long  tf, long  tc, long tv) {
+    public ThreadCliente(Socket socket, String ipCliente, int idCli) {
         this.socket = socket; // Inicializar el socket del cliente
         this.ipCliente = ipCliente; // Inicializar la IP del cliente
         this.idCli = idCli; // Inicializar el id del cliente 
-        this.tiempoFirma = tf; // Inicializar el tiempo de firma
-        this.tiempoCifrado = tc; // Inicializar el tiempo de cifrado
-        this.tiempoVerificar = tv; // Inicializar el tiempo de verificación
     }
 
     // run
@@ -167,6 +161,7 @@ public class ThreadCliente extends Thread {
             // Paso 13b: Recibir tabla de servicios cifrada y verficar HMAC
                 // Leer tabla de servicios y decifrarla
             String Servicios = lector.readLine(); // Leer tabla de servicios cifrada
+
             try{
                 String serviciosDecifrados = Algoritmos.AES_Decifrado(Servicios, K_AB1, iv); // Decifrar tabla de servicios
              
@@ -184,18 +179,16 @@ public class ThreadCliente extends Thread {
                     return; // Terminar el hilo si hay error
                 } 
                 long tiempoFinV = System.nanoTime(); // Detener temporizador
-                tiempoVerificar += tiempoFinV - tiempoInicioV; // Calcular tiempo de verificación
             } catch (Exception e) {
                 e.printStackTrace(); // Manejar excepciones
-            } 
-
+            }
                 
             
             // Paso 14: Enviar id servicio + ip cliente cifrados
                 
                 // Generar id de servicio aleatorio
             Random randomId = new Random(); // Generar id de servicio aleatorio
-            int idServicio = randomId.nextInt(2) + 1; // Número aleatorio entre 1 y 3
+            int idServicio = randomId.nextInt(2)+1; // Número aleatorio entre 1 y 3
             String idServicioStr = "S" + String.valueOf(idServicio); // Convertir id de servicio a string
 
             try{
@@ -211,12 +204,12 @@ public class ThreadCliente extends Thread {
                 escritor.println(hmacBase64); // Enviar HMAC al cliente
             } catch (Exception e) {
                 e.printStackTrace(); // Manejar excepciones
-            }
-            
+            }            
+
             // Paso 17: Recibir ipServicio y Puerto, y verficar HMAC
                 // Leer ipServicio;Puerto cifrados
             String recibido = lector.readLine(); // Leer tabla de servicios cifrada 
-            
+
             try{
                 // Leer ipServicio;Puerto cifrados y decifrarlo
                 String recibDecifrado = Algoritmos.AES_Decifrado(recibido, K_AB1, iv); // Descifrar 
@@ -230,16 +223,15 @@ public class ThreadCliente extends Thread {
                 long tiempoInicioV = System.nanoTime(); // Iniciar temporizador
                 byte[] hmacCalculado = Algoritmos.calculoHMac(K_AB2, recibDecifradoBytes); // Calcular HMAC localmente
                 
-                //Verificar HMAC
+                //Verificar HMAC 
+                
                 if(Algoritmos.verificar(hmacRecibidoBytes, hmacCalculado)) { // Verificar HMAC
-                    System.out.println("HMAC 3 correcto"); // Imprimir HMAC correcto 
+                    escritor.println("OK"); // Enviar OK al servidor
                 } else {
                     System.out.println("HMAC 3 incorrecto"); // Imprimir HMAC incorrecto
+                    escritor.println("ERROR"); // Enviar ERROR al servidor
                     return; // Terminar el hilo si hay error
                 } 
-                long tiempoFinV = System.nanoTime(); // Detener temporizador
-                tiempoVerificar += tiempoFinV - tiempoInicioV; // Calcular tiempo de verificación
-
 
             }
             catch (Exception e) {
@@ -252,9 +244,11 @@ public class ThreadCliente extends Thread {
             escritor.close();
             socket.close();
 
+            System.out.println("Cliente " + idCli + " desconectado"); // Imprimir cliente desconectado
+
         } catch (IOException e) {
             e.printStackTrace();
+            System.err.println("Error al conectar el cliente: " + idCli + ":" + e.getMessage()); // Imprimir error de conexión
         } 
-    System.out.println("Cliente " + " " + idCli +" " + "su Tiempo de Verificacion es : " + " " + tiempoVerificar); 
     } 
 }

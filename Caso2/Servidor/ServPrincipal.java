@@ -8,45 +8,84 @@ import java.lang.reflect.Array;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.concurrent.CyclicBarrier;
 
 public class ServPrincipal {
+
+    public static long tiempoFirma = 0; 
+    public static long tiempoCifrado = 0; 
+    public static long tiempoVerificar = 0;
+    public static long tiempoRSA = 0; // Tiempo total de ejecución
+    private static int numClientes = 0; // Número de clientes a manejar
+      
+
     public static void main(String args[]) throws IOException {
         
         ServerSocket ss = null;
         boolean continuar = true;
         ArrayList<ArrayList<String>> servidores = tablaServidores(); // Matriz almacena datos servidores
         int i = 0; // Contador para los hilos
-       long tiempoFirma = 0; 
-        long tiempoCifrado = 0; 
-        long tiempoVerificar = 0;
+
+        // Crear la barrera
+        CyclicBarrier barrier = new CyclicBarrier(1, () -> {
+            // Acción cuando todos los hilos terminen
+            imprimirTiempos();
+            numClientes = 0; // Reiniciar el contador de clientes
+            System.out.println("Fin del servidor principal.");
+        });
+        
 
         // Generar llaves RSA
         Algoritmos.generarLlavesRSA(); 
         System.out.println("Llaves RSA generadas y guardadas en archivos.");
 
         try {
-            ss = new ServerSocket(3400); // TODO: no sé cuál es el puerto del principal
-            System.out.println("Servidor principal activado ...");
+            ss = new ServerSocket(3400);
+            ss.setSoTimeout(5000);
+            System.out.println("Servidor principal activado ..." + "\n");
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(-1);
         }
 
         while (continuar) {
-            // crear el socket del servidor y espera un cliente
-            Socket socket = ss.accept();
-            System.out.println("Cliente conectado: " + socket.getInetAddress()); // IP de quien se conectó
+            try {
+                // crear el socket del servidor y espera un cliente
+                Socket socket = ss.accept();
 
-            // Crear un nuevo hilo para manejar al cliente
-            new ThreadServPrincipal(socket, i, tiempoFirma,tiempoCifrado,tiempoVerificar).start();
-            i++; // Incrementar contador hilos
+                i++; // Incrementar contador hilos
+                numClientes++; // Incrementar contador clientes
+
+                //Actualizar barrera
+                barrier = new CyclicBarrier(numClientes, () -> {
+                    // Acción cuando todos los hilos terminen
+                    imprimirTiempos();
+                    numClientes = 0; // Reiniciar el contador de clientes
+                    System.out.println("Fin del servidor principal.");
+                });
+
+                // Crear un nuevo hilo para manejar al cliente
+                new ThreadServPrincipal(socket, i, barrier).start();
+                
+            } catch (IOException e) {
+                System.out.println("Tiempo de espera agotado. No se aceptan más conexiones.");
+                continuar = false; // Salir del bucle si no hay más conexiones
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
+        try {
+            ss.close(); // Cerrar el socket del servidor
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    
     
     }
 
     // getter de la tabla de servidores
-    public static ArrayList<ArrayList<String>> getTablaServidores() {
+    public synchronized static ArrayList<ArrayList<String>> getTablaServidores() {
         return tablaServidores();
     }
 
@@ -76,5 +115,25 @@ public class ServPrincipal {
         servidores.add(servidor3);
 
         return servidores;
+    }
+
+    public synchronized static void imprimirTiempos() {
+        System.out.println("\n" + "--------------------------------------------");
+        System.out.println("Tiempo total de firma: " + tiempoFirma/numClientes + " ms");
+        System.out.println("Tiempo total de cifrado llave simétrica: " + tiempoCifrado/numClientes + " ms");
+        System.out.println("Tiempo total de verificación: " + tiempoVerificar/numClientes + " ms");
+        System.out.println("Tiempo total de cifrado llave asimétrica: " + tiempoRSA/numClientes + " ms");
+        System.out.println("--------------------------------------------" + "\n");
+    }
+
+    public synchronized static void actualizarTiempos(long tiempoFirma, long tiempoCifrado, long tiempoVerificar, long tiempoRSA) {
+        ServPrincipal.tiempoFirma += tiempoFirma; // Acumular el tiempo de firma
+        ServPrincipal.tiempoCifrado += tiempoCifrado; // Acumular el tiempo de cifrado
+        ServPrincipal.tiempoVerificar += tiempoVerificar; // Acumular el tiempo de verificación
+        ServPrincipal.tiempoRSA += tiempoRSA; // Acumular el tiempo total de cifrado y verificación
+    }   
+
+    public void setNumClientes(int numClientes) {
+        ServPrincipal.numClientes = numClientes;
     }
 }

@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.concurrent.CyclicBarrier;
 import java.security.spec.*;
 import javax.crypto.*;
 import javax.crypto.interfaces.DHPublicKey;
@@ -32,18 +33,18 @@ public class ThreadServPrincipal extends Thread {
     private SecretKey K_AB1 = null; // Guarda K_AB1
     private byte[] K_AB2 = null; // Guarda K_AB2
     private IvParameterSpec iv = null; // Guarda IV para AES 
-    private long tiempoFirma; // Tiempo de firma
-    private long tiempoCifrado; // Tiempo de cifrado
-    private long tiempoVerificar; // Tiempo de verificación
+    private long tiempoFirma = 0; // Tiempo de firma
+    private long tiempoCifrado = 0; // Tiempo de cifrado
+    private long tiempoVerificar = 0; // Tiempo de verificación
+    private long tiempoRSA = 0; // Tiempo de cifrado con RSA
+    private CyclicBarrier barrier; // Barrera para sincronización de hilos
 
     // Constructor
-    public ThreadServPrincipal(Socket socket, int id, long tiempoFirma, long tiempoCifrado, long tiempoVerificar) {
+    public ThreadServPrincipal(Socket socket, int id, CyclicBarrier barrier) {
         this.sktCli = socket;
         this.id = id;
-        this.tiempoFirma = tiempoFirma; // Inicializar tiempo de firma
-        this.tiempoCifrado = tiempoCifrado; // Inicializar tiempo de cifrado
-        this.tiempoVerificar = tiempoVerificar; // Inicializar tiempo de verificación
-    }
+        this.barrier = barrier; // Guardar la barrera
+        }
 
     // run
     public void run() {
@@ -65,12 +66,11 @@ public class ThreadServPrincipal extends Thread {
 
             // Paso 1: Leer "HELLO" del cliente
             String saludo = lector.readLine(); // Leer saludo del cliente
-            if (saludo.equals("HELLO")) { // Saludo correcto
-                System.out.println("Saludo correcto del cliente: " + saludo); // Imprimir saludo correcto
-            } else {
+            if (!saludo.equals("HELLO")) { // Saludo correcto
                 System.out.println("Error en el saludo del cliente: " + saludo); // Imprimir error en el saludo
                 return; // Terminar el hilo si hay error
             }
+
             
             // Paso 2b, 3 y 4: Recibir reto (número aleatorio), calcular ruta con Rta con RSA y enviarlo
             String reto = lector.readLine(); // Leer reto
@@ -83,9 +83,8 @@ public class ThreadServPrincipal extends Thread {
             if (respuesta1.equals("ERROR")) { // Si la respuesta es Error
                 System.out.println("Error en la conexión, cerrando el hilo."); // Imprimir error
                 return; // Terminar el hilo si hay error
-            } else if (respuesta1.equals("OK")) { // Si la respuesta es OK
-                System.out.println("Respuesta correcta del cliente: " + respuesta1); // Imprimir respuesta correcta
             }
+
 
             // Paso 7: Generar G, P, G^x, y F(K_w-, (G, P, G^x)) con DiffieHellman1
             try {
@@ -120,6 +119,7 @@ public class ThreadServPrincipal extends Thread {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+
             
 
             // Recibir ok o error
@@ -127,9 +127,7 @@ public class ThreadServPrincipal extends Thread {
             if (respuesta2.equals("ERROR")) { // Si la respuesta es Error
                 System.out.println("Error en la conexión, cerrando el hilo."); // Imprimir error
                 return; // Terminar el hilo si hay error
-            } else {
-                System.out.println("Respuesta del cliente: " + respuesta2); // Imprimir respuesta correcta
-            }
+            } 
 
             // Paso 11b: Recibe G^y, luego calcula (G^y)^x con DiffieHellman2
             String gY = lector.readLine(); // Leer G^y del cliente
@@ -138,6 +136,7 @@ public class ThreadServPrincipal extends Thread {
             String IV = lector.readLine(); // Leer IV del cliente
             byte[] ivBytes = Base64.getDecoder().decode(IV); // Decodificar IV de Base64
             this.iv = new IvParameterSpec(ivBytes);
+
 
 
             try{
@@ -153,6 +152,8 @@ public class ThreadServPrincipal extends Thread {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+
+
             
             // Paso 11b.2: calcula  K_AB1 y MAC K_AB2 
             try {
@@ -172,6 +173,7 @@ public class ThreadServPrincipal extends Thread {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+
             
             // Paso 13: Cifrar y enviar C(K_AB1, tabla_ids_servicios) y HMAC(MAC K_AB2, tabla_ids_servicios)
                 // Enviar tabla
@@ -202,6 +204,18 @@ public class ThreadServPrincipal extends Thread {
                 e.printStackTrace();
                 throw new RuntimeException("Error al calcular HMAC del id de servicio", e);
             }
+
+            // PASO EXTRA: Calcular tiempo cifrado con llave publica RSA así no se use para nada
+            long tiempoInicioRSA = System.nanoTime(); // Iniciar tiempo de cifrado
+            try {
+                // Cifrar la tabla de servicios con RSA
+                byte[] cifradoRSA = Algoritmos.RSA(llavePublica, envioTabla.getBytes(), true); // Cifrar la tabla de servicios con RSA
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("Error al cifrar la tabla de servicios con RSA", e);
+            }
+            long tiempoFinRSA = System.nanoTime(); // Terminar tiempo de cifrado
+            tiempoRSA += tiempoFinRSA - tiempoInicioRSA; // Calcular tiempo de cifrado con RSA
         
             
             // Paso 15: Verifica HMAC; recibe C(K_AB1, id_servicio + ip_cliente) y HMAC(K_AB2, id_servicio + ip_cliente)
@@ -236,6 +250,7 @@ public class ThreadServPrincipal extends Thread {
                 throw new RuntimeException("Error al descifrar el id de servicio", e);
             }
 
+
             
             // Paso 16: Envía C(K_AB1, ip_servidor + puerto_servidor) y HMAC(K_AB2, ip_servidor + puerto_servidor)
                 // Enviar ip y puerto
@@ -258,35 +273,53 @@ public class ThreadServPrincipal extends Thread {
                             byte[] hmac = Algoritmos.calculoHMac(K_AB2, envioIPPuertoBytes); // Calcular HMAC 
                             String hmacBase64 = Base64.getEncoder().encodeToString(hmac); // Convertir HMAC a Base64
                             escritor.println(hmacBase64); // Enviar HMAC al cliente
-                            System.out.println("HMAC 3 enviado: " + hmacBase64); // Imprimir HMAC enviado
                     } catch (Exception e) {
                         e.printStackTrace();
                         throw new RuntimeException("Error al calcular HMAC de la ip y puerto", e);
                     }
+                    break;
                 }    
-                break;
             }
 
 
+            
             // Final: recibe "Ok" o "Error" y termina el hilo
             String respuesta3 = lector.readLine(); // Leer respuesta del cliente
-            if (respuesta3.equals("Ok")) { // Si la respuesta es Ok
-                System.out.println("Respuesta correcta del cliente: " + respuesta3); // Imprimir respuesta correcta
-            } else {
+            if (!respuesta3.equals("OK")) { // Si la respuesta es Ok
                 System.out.println("Error en la respuesta del cliente: " + respuesta3); // Imprimir error en la respuesta
             }
 
-
-            // Se cierran flujos y socket
+            // Cerrar flujos
             lector.close();
             escritor.close();
-            sktCli.close();
+            
         } catch (IOException e) {
             e.printStackTrace();
-        } 
-        System.out.println("Servidor " + " " + id +" " + "su Tiempo de Verificacion es : " + " " + tiempoVerificar); 
-        System.out.println("Servidor " + " " + id +" " + "su Tiempo de Cifrado es : " + " " + tiempoCifrado); 
-        System.out.println("Servidor " + " " + id +" " + "su Tiempo de Firma es : " + " " + tiempoFirma);
+        }
+
+        // Actualizar tiempos globales
+        ServPrincipal.actualizarTiempos(
+            tiempoFirma, // Tiempo de firma
+            tiempoCifrado, // Tiempo de cifrado
+            tiempoVerificar, // Tiempo de verificación
+            tiempoRSA // Tiempo de cifrado con RSA
+        );
+    
+        // Se cierra socket
+        try {
+            sktCli.close(); // Cerrar socket
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        finally {
+            // Sincronizar hilos
+            try {
+                barrier.await(); // Esperar a que todos los hilos lleguen a la barrera
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
 }
